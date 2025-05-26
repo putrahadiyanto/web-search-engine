@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,6 +13,7 @@
         }
     </style>
 </head>
+
 <body class="bg-slate-50 min-h-screen">
     <div class="container mx-auto px-4 py-12 max-w-4xl">
         <!-- Header -->
@@ -29,28 +31,30 @@
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         placeholder="https://example.com">
                 </div>
-                
+
                 <div>
                     <label for="keyword" class="block text-sm font-medium text-gray-700 mb-1">Keyword</label>
                     <input type="text" id="keyword" name="keyword" required
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         placeholder="Enter search keyword">
                 </div>
-                
+
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label for="depth_limit" class="block text-sm font-medium text-gray-700 mb-1">Depth Limit</label>
+                        <label for="depth_limit" class="block text-sm font-medium text-gray-700 mb-1">Depth
+                            Limit</label>
                         <input type="number" id="depth_limit" name="depth_limit" min="1" value="3" required
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
-                    
+
                     <div>
-                        <label for="width_limit" class="block text-sm font-medium text-gray-700 mb-1">Width Limit</label>
+                        <label for="width_limit" class="block text-sm font-medium text-gray-700 mb-1">Width
+                            Limit</label>
                         <input type="number" id="width_limit" name="width_limit" min="1" value="5" required
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
                 </div>
-                
+
                 <div class="text-center">
                     <button type="submit"
                         class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition duration-200">
@@ -64,7 +68,8 @@
         <div class="bg-white rounded-xl shadow-md overflow-hidden">
             <div class="border-b border-gray-200 bg-gray-50 px-4 py-3 flex justify-between items-center">
                 <h2 class="text-lg font-medium text-gray-900">Crawler Log</h2>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                <span
+                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                     Results
                 </span>
             </div>
@@ -79,4 +84,5 @@
         <p>© 2023 Web Crawler - Analisis dan Desain Algoritma</p>
     </footer>
 </body>
+
 </html>
