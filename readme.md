@@ -1,0 +1,1 @@
+A web-based application that crawls and searches for hyperlinks within a given URL using the Breadth-First Search (BFS) algorithm. It extracts and displays all reachable links starting from the specified URL, providing a simple and interactive interface for web crawling.
