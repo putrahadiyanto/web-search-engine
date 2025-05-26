@@ -30,7 +30,8 @@ def search_string(keyword, start_url='', max_depth=0, max_width=0, timeout=0):
     if max_depth < 1 or max_width < 1:
         logger.error("Depth and width must be at least 1")
         return []
-      # Run the web crawler to collect pages
+    
+    # Run the web crawler to collect pages
     result = bfs_crawl(start_url=start_url, max_depth=max_depth, max_width=max_width, timeout=timeout)
     logger.info(f"Crawler returned {len(result)} pages to search through")
     
@@ -39,22 +40,6 @@ def search_string(keyword, start_url='', max_depth=0, max_width=0, timeout=0):
         url = entry['url']
         current_depth = entry['depth']
         
-        # Update progress information if we're in a Flask context
-        try:
-            if current_app:
-                current_app.config['CRAWL_PROGRESS'] = {
-                    'current_depth': current_depth,
-                    'current_width': min(i % max_width + 1, max_width),
-                    'max_depth': max_depth,
-                    'max_width': max_width,
-                    'current_url': url,
-                    'total_visited': i + 1,
-                    'matched_count': len(filtered_results)
-                }
-        except RuntimeError:
-            # Not in Flask context, ignore
-            pass
-            
         logger.info(f"Searching [{i+1}/{len(result)}] {url} for keyword '{keyword}'")
         try:
             response = requests.get(url, timeout=timeout)
@@ -65,15 +50,6 @@ def search_string(keyword, start_url='', max_depth=0, max_width=0, timeout=0):
             if keyword.lower() in html_text.lower():
                 logger.info(f"MATCH FOUND: {url}")
                 filtered_results.append(entry)
-                
-                # Update matched count in progress
-                try:
-                    if current_app:
-                        progress = current_app.config.get('CRAWL_PROGRESS', {})
-                        progress['matched_count'] = len(filtered_results)
-                        current_app.config['CRAWL_PROGRESS'] = progress
-                except RuntimeError:
-                    pass
             else:
                 logger.info(f"No match in {url}")
                 

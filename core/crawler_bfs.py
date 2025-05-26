@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup # library buat scraping crawler
 from urllib.parse import urljoin, urlparse # buat parsing URL (jadi bisa tahu apakah url merupakan sub domain)
 import requests # (biar bisa request http)
 import logging # buat print timestamp
+from flask import current_app # untuk Flask context (jika digunakan dalam aplikasi Flask)
 
 # ini format logging yang akan digunakan (2025-05-26 15:04:03,425 INFO __main__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s') 
@@ -108,7 +109,23 @@ def bfs_crawl(start_url, max_depth=3, max_width=5, timeout=5):
             
             # Tambahkan hasil crawling ke results
             results.append({'url': current_url, 'title': title, 'depth': depth, 'parent': parent})
-            
+
+            # Update CRAWL_PROGRESS if running in Flask context
+            try:
+                
+                if current_app:
+                    current_app.config['CRAWL_PROGRESS'] = {
+                        'current_depth': depth,
+                        'current_width': min(len(queue), max_width),
+                        'max_depth': max_depth,
+                        'max_width': max_width,
+                        'current_url': current_url,
+                        'total_visited': len(visited) + 1,
+                        'matched_count': len(results)  # This is just total crawled, not matches
+                    }
+            except Exception:
+                pass
+
             # Tambahkan current_url ke visited
             visited.add(current_url)
 
