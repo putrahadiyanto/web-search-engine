@@ -90,11 +90,11 @@ def bfs_crawl(start_url, max_depth=3, max_width=5, timeout=5):
             response = requests.get(current_url, timeout=timeout)
 
             # Cek status code dari response
-            logger.debug(f"Status code for {current_url}: {response.status_code}\n")
+            logger.debug(f"Status code for {current_url}: {response.status_code}")
 
             # Jika status code tidak 200 (OK), log peringatan dan lanjut ke URL berikutnya
             if response.status_code != 200:
-                logger.warning(f"Failed to fetch {current_url} (status: {response.status_code})\n")
+                logger.warning(f"Failed to fetch {current_url} (status: {response.status_code})")
                 continue
 
             # Parsing HTML dari response pake beautifulsoup
@@ -104,7 +104,7 @@ def bfs_crawl(start_url, max_depth=3, max_width=5, timeout=5):
             title = soup.title.string.strip() if soup.title and soup.title.string else ''
             
             # Log informasi tentang judul halaman
-            logger.info(f"Adding result: {current_url} (title: {title}, depth: {depth}, parent: {parent})\n")
+            logger.info(f"Adding result: {current_url} (title: {title}, depth: {depth}, parent: {parent})")
             
             # Tambahkan hasil crawling ke results
             results.append({'url': current_url, 'title': title, 'depth': depth, 'parent': parent})
@@ -134,7 +134,7 @@ def bfs_crawl(start_url, max_depth=3, max_width=5, timeout=5):
                 """
 
                 # Log jumlah link yang ditemukan
-                logger.debug(f"Found {len(links)} links on {current_url}\n")
+                logger.debug(f"Found {len(links)} links on {current_url}")
 
                 # Filter link yang sesuai dengan base_domain dan belum pernah dikunjungi
                 next_links = []
@@ -153,12 +153,12 @@ def bfs_crawl(start_url, max_depth=3, max_width=5, timeout=5):
                         break
 
                 # Log jumlah link yang akan ditambahkan ke queue
-                logger.info(f"Selected {len(next_links)} new links at depth {depth+1} from {current_url}\n")
-                logger.info(f"Expanded links from {current_url}: {next_links}\n")
+                logger.info(f"Selected {len(next_links)} new links at depth {depth+1} from {current_url}")
+                logger.info(f"Expanded links from {current_url}: {next_links}")
 
                 # Tambahkan link yang sesuai ke queue untuk diproses di depth berikutnya
                 for link in next_links:
-                    logger.debug(f"Queueing link: {link} (parent: {current_url}, next depth: {depth+1})\n")
+                    logger.debug(f"Queueing link: {link} (parent: {current_url}, next depth: {depth+1})")
                     queue.append((link, depth + 1, current_url))  # Pass current_url as parent
 
         # Jika terjadi error saat mengambil data dari current_url, log error dan lanjut ke URL berikutnya

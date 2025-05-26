@@ -493,56 +493,7 @@
                         document.getElementById('route-path-content').innerHTML = routePath;
                     }, 500);
                 }
-            });              // AJAX search function for the search form
-            const ajaxSearchForm = document.getElementById('ajax-search-form');
-            
-            if (ajaxSearchForm) {
-                ajaxSearchForm.addEventListener('submit', function(event) {
-                    event.preventDefault();
-                    
-                    const seedUrl = document.getElementById('seed_url').value;
-                    const keyword = document.getElementById('keyword').value;
-                    const depthLimit = document.getElementById('depth_limit').value;
-                    const widthLimit = document.getElementById('width_limit').value;
-                    
-                    if (!keyword) {
-                        alert('Please enter a keyword to search for');
-                        return false;
-                    }
-                    
-                    // Show loading indicator
-                    loading.classList.remove('hidden');
-                    
-                    // Make AJAX call
-                    fetch('/search_ajax', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            seed_url: seedUrl,
-                            keyword: keyword,
-                            depth_limit: depthLimit,
-                            width_limit: widthLimit
-                        }),
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            // Reload the page with the results
-                            window.location.href = '/?results=' + encodeURIComponent(JSON.stringify(data.results));
-                        } else {
-                            loading.classList.add('hidden');
-                            alert('Error: ' + data.message);
-                        }
-                    })
-                    .catch(error => {
-                        loading.classList.add('hidden');
-                        alert('Error: ' + error.message);
-                    });
-                });
-            }
-              
+            });              
             // Progress tracking function
             function startProgressTracking() {
                 const progressInterval = setInterval(function() {
