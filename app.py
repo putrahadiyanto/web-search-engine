@@ -1,8 +1,4 @@
 from flask import Flask, request, render_template
-import requests
-from urllib.parse import urlparse, parse_qs
-from bs4 import BeautifulSoup
-from collections import deque
 
 app = Flask(__name__)
 
