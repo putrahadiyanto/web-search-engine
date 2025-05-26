@@ -168,8 +168,10 @@ def bfs_crawl(start_url, max_depth=3, max_width=5, timeout=5):
     logger.info(f"Crawling finished. Total pages visited: {len(visited)}. Total results: {len(results)}.")
     return results
 
-result = bfs_crawl(start_url='http://upi.edu', max_depth=3, max_width=3)
-print("Crawl Results:")
-for entry in result:
-    print(entry)
+# Only run this code if the file is executed directly
+if __name__ == "__main__":
+    result = bfs_crawl(start_url='http://upi.edu', max_depth=3, max_width=3)
+    print("Crawl Results:")
+    for entry in result:
+        print(entry)
 

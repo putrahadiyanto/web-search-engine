@@ -6,91 +6,601 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web Crawler Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
         }
+        
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        
+        .modal-active {
+            overflow-x: hidden;
+            overflow-y: visible !important;
+        }
+        
+        .progress-container {
+            background: #f3f4f6;
+            border-radius: 0.5rem;
+            height: 1.5rem;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            background: #3b82f6;
+            height: 100%;
+            position: absolute;
+            transition: width 0.3s ease;
+            border-radius: 0.5rem;
+        }
     </style>
 </head>
 
 <body class="bg-slate-50 min-h-screen">
-    <div class="container mx-auto px-4 py-12 max-w-4xl">
-        <!-- Header -->
+    <div class="container mx-auto px-4 py-12 max-w-4xl">        <!-- Header -->
         <header class="text-center mb-12">
             <h1 class="text-4xl font-bold text-blue-600 mb-2">Web Crawler</h1>
             <p class="text-slate-500">Search and analyze web content efficiently</p>
+            
+            <!-- Route search button -->
+            <button id="modal-open-btn" class="mt-4 bg-blue-100 hover:bg-blue-200 text-blue-800 font-medium py-1 px-4 rounded-lg transition duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                Search Routes
+            </button>
         </header>
 
         <!-- Search Form -->
         <div class="bg-white rounded-xl shadow-md p-6 mb-8">
             <!-- Update form action to point to /submit -->
-            <form method="post" action="/" class="space-y-6">
-                <div>
+            <form method="post" action="/" class="space-y-6">                <div>
                     <label for="seed_url" class="block text-sm font-medium text-gray-700 mb-1">Seed URL</label>
                     <input type="url" id="seed_url" name="seed_url" required
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="https://example.com">
+                        placeholder="https://example.com" value="{{ seed_url }}">
                 </div>
 
                 <div>
                     <label for="keyword" class="block text-sm font-medium text-gray-700 mb-1">Keyword</label>
                     <input type="text" id="keyword" name="keyword" required
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Enter search keyword">
+                        placeholder="Enter search keyword" value="{{ keyword }}">
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
+                <div class="grid grid-cols-2 gap-4">                    <div>
                         <label for="depth_limit" class="block text-sm font-medium text-gray-700 mb-1">Depth
                             Limit</label>
-                        <input type="number" id="depth_limit" name="depth_limit" min="1" value="3" required
+                        <input type="number" id="depth_limit" name="depth_limit" min="1" value="{{ depth_limit or 3 }}" required
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-
-                    <div>
+                    </div>                    <div>
                         <label for="width_limit" class="block text-sm font-medium text-gray-700 mb-1">Width
                             Limit</label>
-                        <input type="number" id="width_limit" name="width_limit" min="1" value="5" required
+                        <input type="number" id="width_limit" name="width_limit" min="1" value="{{ width_limit or 5 }}" required
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
-                </div>
-
-                <div class="text-center">
+                </div>            <div class="text-center">
                     <button type="submit"
                         class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition duration-200">
                         Start Crawling
                     </button>
                 </div>
-            </form>
+                <div class="mt-4 text-center text-sm text-gray-500">
+                    <p>Default values will be used if not specified: URL = http://upi.edu, Depth = 3, Width = 5</p>
+                </div>
+            </form>        </div>
+        
+        <!-- Progress Indicator -->
+        <div id="loading" class="hidden bg-blue-50 border-l-4 border-blue-500 p-4 mb-8 rounded shadow-sm">
+            <div class="flex items-center">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="text-blue-700">Searching... This may take a few minutes depending on the depth and width settings.</p>
+            </div>
         </div>
-
-        <!-- Message Display -->
-        {% if message %}
-        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-8 rounded shadow-sm">
-            <p class="text-blue-700">{{ message }}</p>
+        
+        <!-- Route Step Tracker -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+            <h2 class="text-lg font-medium text-gray-900 mb-4">Current Crawling Progress</h2>
+            
+            <!-- Step display -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <h3 class="text-sm font-medium text-gray-700 mb-2">Depth Progress</h3>
+                    <div class="progress-container">
+                        <div class="progress-bar" id="main-depth-progress" style="width: 0%"></div>
+                    </div>
+                    <div class="mt-1 flex justify-between text-xs text-gray-500">
+                        <span>Current: <span id="main-current-depth">0</span></span>
+                        <span>Max: <span id="main-max-depth">0</span></span>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-sm font-medium text-gray-700 mb-2">Width Progress</h3>
+                    <div class="progress-container">
+                        <div class="progress-bar" id="main-width-progress" style="width: 0%"></div>
+                    </div>
+                    <div class="mt-1 flex justify-between text-xs text-gray-500">
+                        <span>Current: <span id="main-current-width">0</span></span>
+                        <span>Max: <span id="main-max-width">0</span></span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Current URL -->
+            <div class="mt-4">
+                <h3 class="text-sm font-medium text-gray-700 mb-1">Currently Crawling:</h3>
+                <div class="px-3 py-2 bg-gray-50 rounded-md text-sm text-gray-600 break-all" id="main-current-url">
+                    Not started
+                </div>
+            </div>
+            
+            <!-- View detailed button -->
+            <div class="mt-4 text-center">
+                <button id="view-detailed-progress" class="bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-2 px-4 rounded-lg transition duration-200">
+                    View Detailed Progress
+                </button>
+            </div>
         </div>
-        {% endif %}
-
+        
         <!-- Results Section -->
-        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+        <div class="bg-white rounded-xl shadow-md overflow-hidden mb-8">
             <div class="border-b border-gray-200 bg-gray-50 px-4 py-3 flex justify-between items-center">
-                <h2 class="text-lg font-medium text-gray-900">Crawler Log</h2>
+                <h2 class="text-lg font-medium text-gray-900">Search Status</h2>
                 <span
                     class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    Results
+                    Info
                 </span>
             </div>
-            <div id="log-content" class="p-4 text-sm text-gray-700 font-mono h-64 overflow-y-auto">
-                <p class="text-gray-400">Crawler log will appear here...</p>
-                <!-- Log entries will be added dynamically -->
+            <div id="log-content" class="p-4 text-sm text-gray-700 font-mono max-h-64 overflow-y-auto">
+                {% if message %}
+                    <p class="text-blue-600">{{ message }}</p>
+                {% else %}
+                    <p class="text-gray-400">Submit a search to see results...</p>
+                {% endif %}
+                
+                {% if error %}
+                    <p class="text-red-500 font-bold mt-2">{{ error }}</p>
+                {% endif %}
+            </div>
+        </div>
+          <!-- Search Results -->
+        {% if results %}
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+            <div class="border-b border-gray-200 bg-gray-50 px-4 py-3 flex justify-between items-center">
+                <h2 class="text-lg font-medium text-gray-900">Search Results</h2>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    {{ results|length }} matches
+                </span>
+            </div>            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                {% for result in results %}
+                <div class="bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow p-4">
+                    <h3 class="text-lg font-medium text-blue-600 mb-2">
+                        <a href="{{ result.url }}" target="_blank" class="hover:underline">{{ result.title }}</a>
+                    </h3>
+                    <p class="text-sm text-gray-500 mt-1 break-all">{{ result.url }}</p>
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                            Depth: {{ result.depth }}
+                        </span>
+                        {% if result.parent %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700">
+                            Parent URL
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="mt-4 flex flex-col">
+                        {% if result.parent %}
+                        <p class="text-xs text-gray-500 mb-2">Parent: <a href="{{ result.parent }}" class="text-blue-500 hover:underline break-all">{{ result.parent }}</a></p>
+                        {% endif %}
+                        <button 
+                            data-url="{{ result.url }}"
+                            data-depth="{{ result.depth }}"
+                            data-parent="{{ result.parent or '' }}"
+                            data-title="{{ result.title }}"
+                            class="view-route-btn mt-2 bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-medium py-1.5 px-3 rounded transition duration-200 self-start">
+                            View Route
+                        </button>
+                    </div>                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- No results message -->
+            {% if results|length == 0 %}
+            <div class="p-8 text-center">
+                <p class="text-gray-500">No results found for "{{ keyword }}"</p>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>    <footer class="mt-12 text-center text-sm text-gray-500 pb-6">
+        <p>© 2023 Web Crawler - Analisis dan Desain Algoritma</p>
+    </footer>    <!-- Route Details Modal -->
+    <div id="search-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
+        
+        <div class="modal-container bg-white w-11/12 md:max-w-md mx-auto rounded shadow-lg z-50 overflow-y-auto">
+            <div class="modal-content py-4 text-left px-6">                <!-- Modal Header -->
+                <div class="flex justify-between items-center pb-3">
+                    <p class="text-2xl font-bold">Route Details</p>
+                    <div class="modal-close cursor-pointer z-50" id="close-modal">
+                        <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+                            <path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path>
+                        </svg>
+                    </div>
+                </div>
+                
+                <!-- Modal Body -->
+                <div class="my-5">
+                    <h3 class="font-medium mb-2 text-gray-700">Route to this page:</h3>
+                    <div id="route-details" class="space-y-2 mb-4">
+                        <div id="route-info" class="text-sm text-gray-600">
+                            <p><span class="font-medium">URL:</span> <span id="route-url" class="break-all"></span></p>
+                            <p><span class="font-medium">Parent:</span> <span id="route-parent" class="break-all">-</span></p>
+                            <p><span class="font-medium">Depth:</span> <span id="route-depth">-</span></p>
+                        </div>
+                    </div>
+                    
+                    <!-- Loading Indicator -->
+                    <div id="route-loading" class="hidden text-center py-4">
+                        <svg class="animate-spin inline-block h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p class="mt-2 text-blue-600">Loading route information...</p>
+                    </div>
+                    
+                    <!-- Route Path Display -->
+                    <div id="route-path" class="mt-4">
+                        <h4 class="font-medium text-gray-700 mb-2">Complete Path:</h4>
+                        <div id="route-path-content" class="bg-gray-50 p-3 rounded-lg text-sm text-gray-600 max-h-64 overflow-y-auto">
+                            <p class="text-center text-gray-500">No path information available</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-
-    <footer class="mt-12 text-center text-sm text-gray-500 pb-6">
-        <p>© 2023 Web Crawler - Analisis dan Desain Algoritma</p>
-    </footer>
+    
+    <!-- Progress Tracker Modal -->
+    <div id="progress-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
+        
+        <div class="modal-container bg-white w-11/12 md:max-w-md mx-auto rounded shadow-lg z-50 overflow-y-auto">
+            <div class="modal-content py-4 text-left px-6">
+                <!-- Modal Header -->
+                <div class="flex justify-between items-center pb-3">
+                    <p class="text-2xl font-bold">Crawling Progress</p>
+                    <div class="modal-close cursor-pointer z-50" id="close-progress-modal">
+                        <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+                            <path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path>
+                        </svg>
+                    </div>
+                </div>
+                
+                <!-- Modal Body -->
+                <div class="my-5">
+                    <!-- Depth Progress -->
+                    <div class="mb-4">
+                        <div class="flex justify-between mb-1">
+                            <span class="text-sm font-medium text-gray-700">Depth Progress:</span>
+                            <span class="text-sm font-medium text-gray-700" id="depth-progress-text">0/0</span>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-bar" id="depth-progress-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Width Progress -->
+                    <div class="mb-4">
+                        <div class="flex justify-between mb-1">
+                            <span class="text-sm font-medium text-gray-700">Width Progress:</span>
+                            <span class="text-sm font-medium text-gray-700" id="width-progress-text">0/0</span>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-bar" id="width-progress-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Current URL -->
+                    <div class="mb-4">
+                        <span class="text-sm font-medium text-gray-700">Current URL:</span>
+                        <p class="text-sm text-gray-600 break-all" id="current-url">-</p>
+                    </div>
+                    
+                    <!-- Stats -->
+                    <div class="grid grid-cols-2 gap-4 mt-4">
+                        <div class="bg-blue-50 p-3 rounded-lg text-center">
+                            <span class="block text-sm text-gray-700">Pages Visited</span>
+                            <span class="block text-xl font-bold text-blue-700" id="pages-visited">0</span>
+                        </div>
+                        <div class="bg-green-50 p-3 rounded-lg text-center">
+                            <span class="block text-sm text-gray-700">Matches Found</span>
+                            <span class="block text-xl font-bold text-green-700" id="matches-found">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('form');
+            const loading = document.getElementById('loading');
+            
+            // Main form submission
+            form.addEventListener('submit', function() {
+                const keyword = document.getElementById('keyword').value;
+                
+                if (!keyword.trim()) {
+                    // Prevent form submission if no keyword
+                    event.preventDefault();
+                    return false;
+                }
+                
+                loading.classList.remove('hidden');
+                
+                // Show progress modal
+                document.getElementById('progress-modal').classList.remove('opacity-0', 'pointer-events-none');
+                
+                // Start progress tracking
+                startProgressTracking();
+            });
+            
+            // Modal functionality
+            const modalOpenBtn = document.getElementById('modal-open-btn');
+            const closeModalBtn = document.getElementById('close-modal');
+            const closeProgressModalBtn = document.getElementById('close-progress-modal');
+            const modal = document.getElementById('search-modal');
+            const progressModal = document.getElementById('progress-modal');
+            const overlay = document.querySelector('.modal-overlay');
+            const viewDetailedBtn = document.getElementById('view-detailed-progress');
+            
+            // Open detailed progress modal
+            if (viewDetailedBtn) {
+                viewDetailedBtn.addEventListener('click', function() {
+                    progressModal.classList.remove('opacity-0', 'pointer-events-none');
+                });
+            }
+            
+            // Close modals
+            closeModalBtn.addEventListener('click', function() {
+                modal.classList.add('opacity-0', 'pointer-events-none');
+            });
+            
+            closeProgressModalBtn.addEventListener('click', function() {
+                progressModal.classList.add('opacity-0', 'pointer-events-none');
+            });
+            
+            // View Route button click handlers
+            document.addEventListener('click', function(event) {
+                if (event.target.classList.contains('view-route-btn') || 
+                    event.target.closest('.view-route-btn')) {
+                    
+                    const button = event.target.classList.contains('view-route-btn') ? 
+                                   event.target : 
+                                   event.target.closest('.view-route-btn');
+                    
+                    // Get data from button attributes
+                    const url = button.dataset.url;
+                    const parent = button.dataset.parent || '-';
+                    const depth = button.dataset.depth || '0';
+                    const title = button.dataset.title || url;
+                    
+                    // Set route details in modal
+                    document.getElementById('route-url').textContent = url;
+                    document.getElementById('route-parent').textContent = parent !== '-' ? parent : 'None';
+                    document.getElementById('route-depth').textContent = depth;
+                    
+                    // Show loading indicator
+                    document.getElementById('route-loading').classList.remove('hidden');
+                    document.getElementById('route-path-content').innerHTML = 
+                        '<p class="text-center text-gray-500">Loading path information...</p>';
+                    
+                    // Open the modal
+                    modal.classList.remove('opacity-0', 'pointer-events-none');
+                    
+                    // For demonstration, generate a path based on what we know
+                    // In a real application, this would come from the server
+                    setTimeout(() => {
+                        let routePath = '';
+                        
+                        if (parent !== '-' && parent !== '') {
+                            routePath = `
+                                <div class="space-y-2">
+                                    <div class="flex items-start">
+                                        <div class="bg-green-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
+                                            <span class="text-xs font-medium text-green-800">1</span>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-medium">Start URL</p>
+                                            <a href="${document.getElementById('seed_url').value}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">
+                                                ${document.getElementById('seed_url').value}
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <div class="ml-3 border-l-2 border-gray-200 pl-5 py-2">
+                                        <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="flex items-start">
+                                        <div class="bg-blue-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
+                                            <span class="text-xs font-medium text-blue-800">${parseInt(depth) > 1 ? '...' : '2'}</span>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-medium">Parent Page</p>
+                                            <a href="${parent}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">${parent}</a>
+                                        </div>
+                                    </div>
+                                    <div class="ml-3 border-l-2 border-gray-200 pl-5 py-2">
+                                        <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="flex items-start">
+                                        <div class="bg-purple-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
+                                            <span class="text-xs font-medium text-purple-800">${parseInt(depth) + 1}</span>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-medium">${title}</p>
+                                            <a href="${url}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">${url}</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            routePath = `
+                                <div class="space-y-2">
+                                    <div class="flex items-start">
+                                        <div class="bg-green-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
+                                            <span class="text-xs font-medium text-green-800">1</span>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-medium">Start URL</p>
+                                            <a href="${document.getElementById('seed_url').value}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">
+                                                ${document.getElementById('seed_url').value}
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <div class="ml-3 border-l-2 border-gray-200 pl-5 py-2">
+                                        <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="flex items-start">
+                                        <div class="bg-purple-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
+                                            <span class="text-xs font-medium text-purple-800">2</span>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-medium">${title}</p>
+                                            <a href="${url}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">${url}</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                        
+                        // Hide loading and show results
+                        document.getElementById('route-loading').classList.add('hidden');
+                        document.getElementById('route-path-content').innerHTML = routePath;
+                    }, 500);
+                }
+            });              // AJAX search function for the search form
+            const ajaxSearchForm = document.getElementById('ajax-search-form');
+            
+            if (ajaxSearchForm) {
+                ajaxSearchForm.addEventListener('submit', function(event) {
+                    event.preventDefault();
+                    
+                    const seedUrl = document.getElementById('seed_url').value;
+                    const keyword = document.getElementById('keyword').value;
+                    const depthLimit = document.getElementById('depth_limit').value;
+                    const widthLimit = document.getElementById('width_limit').value;
+                    
+                    if (!keyword) {
+                        alert('Please enter a keyword to search for');
+                        return false;
+                    }
+                    
+                    // Show loading indicator
+                    loading.classList.remove('hidden');
+                    
+                    // Make AJAX call
+                    fetch('/search_ajax', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            seed_url: seedUrl,
+                            keyword: keyword,
+                            depth_limit: depthLimit,
+                            width_limit: widthLimit
+                        }),
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            // Reload the page with the results
+                            window.location.href = '/?results=' + encodeURIComponent(JSON.stringify(data.results));
+                        } else {
+                            loading.classList.add('hidden');
+                            alert('Error: ' + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        loading.classList.add('hidden');
+                        alert('Error: ' + error.message);
+                    });
+                });
+            }
+              
+            // Progress tracking function
+            function startProgressTracking() {
+                const progressInterval = setInterval(function() {
+                    fetch('/get_progress')
+                        .then(response => response.json())
+                        .then(data => {
+                            // Calculate percentages
+                            const depthPercent = data.max_depth ? (data.current_depth / data.max_depth) * 100 : 0;
+                            const widthPercent = data.max_width ? (data.current_width / data.max_width) * 100 : 0;
+                            
+                            // Update modal depth progress
+                            const depthBar = document.getElementById('depth-progress-bar');
+                            const depthText = document.getElementById('depth-progress-text');
+                            depthBar.style.width = depthPercent + '%';
+                            depthText.textContent = data.current_depth + '/' + data.max_depth;
+                            
+                            // Update modal width progress
+                            const widthBar = document.getElementById('width-progress-bar');
+                            const widthText = document.getElementById('width-progress-text');
+                            widthBar.style.width = widthPercent + '%';
+                            widthText.textContent = data.current_width + '/' + data.max_width;
+                            
+                            // Update modal current URL and stats
+                            document.getElementById('current-url').textContent = data.current_url || '-';
+                            document.getElementById('pages-visited').textContent = data.total_visited;
+                            document.getElementById('matches-found').textContent = data.matched_count;
+                            
+                            // Update main page progress indicators
+                            document.getElementById('main-depth-progress').style.width = depthPercent + '%';
+                            document.getElementById('main-width-progress').style.width = widthPercent + '%';
+                            document.getElementById('main-current-depth').textContent = data.current_depth;
+                            document.getElementById('main-max-depth').textContent = data.max_depth;
+                            document.getElementById('main-current-width').textContent = data.current_width;
+                            document.getElementById('main-max-width').textContent = data.max_width;
+                            document.getElementById('main-current-url').textContent = data.current_url || 'Not started';
+                            
+                            // If crawling is done, hide loading indicator
+                            if (data.total_visited > 0 && data.current_depth >= data.max_depth) {
+                                loading.classList.add('hidden');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error fetching progress:', error);
+                        });
+                }, 1000); // Update every second
+                
+                // Store interval ID to clear it later
+                window.progressInterval = progressInterval;
+                
+                // Stop progress tracking after a reasonable timeout (5 minutes)
+                setTimeout(function() {
+                    if (window.progressInterval) {
+                        clearInterval(window.progressInterval);
+                    }
+                }, 5 * 60 * 1000);
+            }
+        });
+    </script>
 </body>
 
 </html>
