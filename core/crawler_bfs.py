@@ -24,7 +24,7 @@ def bfs_crawl(start_url, max_depth=3, max_width=5, timeout=5):
 
     # inisialisasi variabel
     visited = set() # untuk menyimpan URL yang sudah dikunjungi
-    queue = [(start_url, 0, None)]  # queue untuk BFS, menyimpan tuple (URL, depth, parent)
+    queue = [(start_url, 0, 1, None)]  # queue untuk BFS, menyimpan tuple (URL, depth, parent)
     results = [] # untuk menyimpan hasil crawling {'url': 'http://si.upi.edu', 'title': 'SMS UPI', 'depth': 1, 'parent': 'http://upi.edu'}
 
     # parsing data dari start_url
@@ -48,10 +48,10 @@ def bfs_crawl(start_url, max_depth=3, max_width=5, timeout=5):
     while queue:
 
         # Ambil URL dari queue (dihapu atau di pop) ditaro di current_url, depth, dan parent
-        current_url, depth, parent = queue.pop(0)
+        current_url, depth, width, parent = queue.pop(0)
 
         # Log informasi tentang URL yang sedang dikunjungi
-        logger.info(f"Visiting: {current_url} at depth {depth} (parent: {parent})")
+        logger.info(f"Visiting: {current_url} at depth {depth} width {width} (parent: {parent})")
 
         # Cek apakah URL sudah pernah dikunjungi atau apakah kedalaman sudah melebihi max_depth (jika iya di skip)
         if current_url in visited:
@@ -105,10 +105,10 @@ def bfs_crawl(start_url, max_depth=3, max_width=5, timeout=5):
             title = soup.title.string.strip() if soup.title and soup.title.string else ''
             
             # Log informasi tentang judul halaman
-            logger.info(f"Adding result: {current_url} (title: {title}, depth: {depth}, parent: {parent})")
+            logger.info(f"Adding result: {current_url} (title: {title}, depth: {depth}, width: {width}, parent: {parent})")
             
             # Tambahkan hasil crawling ke results
-            results.append({'url': current_url, 'title': title, 'depth': depth, 'parent': parent})
+            results.append({'url': current_url, 'title': title, 'depth': depth, 'width': width, 'parent': parent})
 
             # Update CRAWL_PROGRESS if running in Flask context
             try:
@@ -155,17 +155,20 @@ def bfs_crawl(start_url, max_depth=3, max_width=5, timeout=5):
 
                 # Filter link yang sesuai dengan base_domain dan belum pernah dikunjungi
                 next_links = []
+                # next_width = []
 
                 # ambil link yang sesuai dengan base_domain (domain awal) atau sub domain, dan belum pernah dikunjungi
                 for link in links:
-                    # parse link
                     parsed_link = urlparse(link)
-                    # cek domain dari link dan subdomain, dan cek apakah link sudah pernah dikunjungi
-                    if (parsed_link.netloc == base_domain or parsed_link.netloc.endswith('.' + base_domain)) and link not in visited:
-                        # jika link sesuai dengan domain dan belum pernah dikunjungi, tambahkan ke next_links
+                    # Cek domain dan apakah link sudah pernah dikunjungi atau sudah ada di queue
+                    # Cek apakah link sudah ada di queue (hanya ambil url dari queue)
+                    queue_urls = set(item[0] for item in queue)
+                    if (
+                        (parsed_link.netloc == base_domain or parsed_link.netloc.endswith('.' + base_domain))
+                        and link not in visited
+                        and link not in queue_urls
+                    ):
                         next_links.append(link)
-
-                    # batasi jumlah link yang akan diambil sesuai dengan max_width
                     if len(next_links) >= max_width:
                         break
 
@@ -174,9 +177,10 @@ def bfs_crawl(start_url, max_depth=3, max_width=5, timeout=5):
                 logger.info(f"Expanded links from {current_url}: {next_links}")
 
                 # Tambahkan link yang sesuai ke queue untuk diproses di depth berikutnya
-                for link in next_links:
-                    logger.debug(f"Queueing link: {link} (parent: {current_url}, next depth: {depth+1})")
-                    queue.append((link, depth + 1, current_url))  # Pass current_url as parent
+                for idx, link in enumerate(next_links):
+                    current_width = idx + 1  # Urutan link pada level ini (1, 2, 3, ...)
+                    logger.debug(f"Queueing link: {link} (parent: {current_url}, next depth: {depth+1}, width: {current_width})")
+                    queue.append((link, depth + 1, current_width, current_url))  # Pass current_url as parent
 
         # Jika terjadi error saat mengambil data dari current_url, log error dan lanjut ke URL berikutnya
         except Exception as e:
@@ -187,8 +191,14 @@ def bfs_crawl(start_url, max_depth=3, max_width=5, timeout=5):
 
 # Only run this code if the file is executed directly
 if __name__ == "__main__":
-    result = bfs_crawl(start_url='http://upi.edu', max_depth=3, max_width=3)
-    print("Crawl Results:")
+    result = bfs_crawl(start_url='http://itb.ac.id', max_depth=3, max_width=3)
+    print("\nCrawl Results:")
+    print("=" * 60)
     for entry in result:
-        print(entry)
+        print(f"URL    : {entry['url']}")
+        print(f"Title  : {entry['title']}")
+        print(f"Depth  : {entry['depth']}")
+        print(f"Width  : {entry['width']}")
+        print(f"Parent : {entry['parent']}")
+        print("-" * 60)
 
