@@ -58,6 +58,4 @@ Aplikasi web ini melakukan crawling dan pencarian kata kunci pada hyperlink dala
 - `requirements.txt` : Daftar dependensi Python
 
 ## Catatan
-- Pastikan URL yang dimasukkan dapat diakses dari jaringan Anda.
 - Proses crawling bisa memakan waktu tergantung pada jumlah halaman dan kecepatan jaringan.
-- Untuk pengembangan, Anda bisa menyesuaikan parameter default di `app.py`.
