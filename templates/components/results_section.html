@@ -1,0 +1,120 @@
+<!-- Results Section with Tabs Component -->
+{% if results %}
+<div class="bg-white rounded-xl shadow-md overflow-hidden mb-8">
+    <div class="border-b border-gray-200 bg-gray-50 px-4 py-3">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-medium text-gray-900">Search Results</h2>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                {{ results|length }} matches
+            </span>
+        </div>
+        
+        <!-- Tab Navigation -->
+        <div class="flex space-x-1">
+            <button class="tab-button active" data-tab="tree-view">
+                <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                Tree View
+            </button>
+            <button class="tab-button" data-tab="list-view">
+                <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                </svg>
+                List View
+            </button>
+        </div>
+    </div>
+
+    <!-- Tree Visualization Tab -->
+    <div id="tree-view" class="tab-content active p-6">
+        <!-- Tree Legend -->
+        <div class="tree-legend mb-4">
+            <div class="legend-item">
+                <div class="legend-circle legend-root"></div>
+                <span>Root Page</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-circle legend-internal"></div>
+                <span>Internal Page</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-circle legend-leaf"></div>
+                <span>Leaf Page</span>
+            </div>
+        </div>
+
+        <!-- Tree Controls -->
+        <div class="tree-controls mb-4">
+            <button id="expand-all" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded text-sm font-medium transition duration-200">
+                Expand All
+            </button>
+            <button id="collapse-all" class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded text-sm font-medium transition duration-200">
+                Collapse All
+            </button>
+            <button id="center-tree" class="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-1 rounded text-sm font-medium transition duration-200">
+                Center Tree
+            </button>
+            <button id="fit-to-screen" class="bg-purple-100 hover:bg-purple-200 text-purple-800 px-3 py-1 rounded text-sm font-medium transition duration-200">
+                Fit to Screen
+            </button>
+        </div>
+
+        <!-- Tree Container -->
+        <div id="tree-visualization" class="w-full h-96 border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+            <svg id="tree-svg" width="100%" height="100%"></svg>
+        </div>
+
+        <!-- Tree Info -->
+        <div class="mt-4 text-sm text-gray-600">
+            <p><strong>Instructions:</strong> Click nodes to expand/collapse, hover for details, drag to pan, scroll to zoom</p>
+            <p><strong>Total Pages:</strong> <span id="total-pages">{{ results|length }}</span> | 
+               <strong>Max Depth:</strong> <span id="max-depth">{{ results|map(attribute='depth')|max if results else 0 }}</span></p>
+        </div>
+    </div>
+
+    <!-- List View Tab -->
+    <div id="list-view" class="tab-content">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+            {% for result in results %}
+            <div class="bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow p-4">
+                <h3 class="text-lg font-medium text-blue-600 mb-2">
+                    <a href="{{ result.url }}" target="_blank" class="hover:underline">{{ result.title }}</a>
+                </h3>
+                <p class="text-sm text-gray-500 mt-1 break-all">{{ result.url }}</p>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                        Depth: {{ result.depth }}
+                    </span>
+                    {% if result.parent %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700">
+                        Parent URL
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="mt-4 flex flex-col">
+                    {% if result.parent %}
+                    <p class="text-xs text-gray-500 mb-2">Parent: <a href="{{ result.parent }}" class="text-blue-500 hover:underline break-all">{{ result.parent }}</a></p>
+                    {% endif %}
+                    <button 
+                        data-url="{{ result.url }}"
+                        data-depth="{{ result.depth }}"
+                        data-parent="{{ result.parent or '' }}"
+                        data-title="{{ result.title }}"
+                        class="view-route-btn mt-2 bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-medium py-1.5 px-3 rounded transition duration-200 self-start">
+                        View Route
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- No results message -->
+        {% if results|length == 0 %}
+        <div class="p-8 text-center">
+            <p class="text-gray-500">No results found for "{{ keyword }}"</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

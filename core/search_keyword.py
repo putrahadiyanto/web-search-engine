@@ -45,7 +45,7 @@ def search_string(keyword, start_url='', max_depth=0, max_width=0, timeout=0):
             response = requests.get(url, timeout=timeout)
             soup = BeautifulSoup(response.text, 'html.parser')
             html_text = soup.get_text(separator=' ', strip=True)
-            
+
             # Simple string matching (case-insensitive)
             if keyword.lower() in html_text.lower():
                 logger.info(f"MATCH FOUND: {url}")

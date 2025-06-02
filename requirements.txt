@@ -1,3 +1,4 @@
 flask
 requests
 beautifulsoup4
+watchdog==2.3.1

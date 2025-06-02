@@ -1,6 +1,6 @@
 from flask import Flask, request, render_template, jsonify
 import logging
-from core.search_keyword import search_string
+from core.crawler_bfs import bfs_crawl
 import json
 
 app = Flask(__name__)
@@ -31,14 +31,14 @@ def index():
             log_message = f"Searching for '{keyword}' starting from {seed_url} (depth: {depth_limit}, width: {width_limit})"
             logger.info(log_message)
             
-            # Execute the search using the search_string function
+            # Execute the search using bfs_crawl directly
             try:
-                results = search_string(
-                    keyword=keyword,
+                results = bfs_crawl(
                     start_url=seed_url,
                     max_depth=depth_limit,
                     max_width=width_limit,
-                    timeout=10
+                    timeout=10,
+                    keyword=keyword
                 )
                 logger.info(f"Found {len(results)} results matching '{keyword}'")
             except Exception as e:

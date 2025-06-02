@@ -1,0 +1,20 @@
+<!-- Search Status Section Component -->
+<div class="bg-white rounded-xl shadow-md overflow-hidden mb-8">
+    <div class="border-b border-gray-200 bg-gray-50 px-4 py-3 flex justify-between items-center">
+        <h2 class="text-lg font-medium text-gray-900">Search Status</h2>
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            Info
+        </span>
+    </div>
+    <div id="log-content" class="p-4 text-sm text-gray-700 font-mono max-h-64 overflow-y-auto">
+        {% if message %}
+            <p class="text-blue-600">{{ message }}</p>
+        {% else %}
+            <p class="text-gray-400">Submit a search to see results...</p>
+        {% endif %}
+        
+        {% if error %}
+            <p class="text-red-500 font-bold mt-2">{{ error }}</p>
+        {% endif %}
+    </div>
+</div>

@@ -1,0 +1,43 @@
+<!-- Route Step Tracker Component -->
+<div class="bg-white rounded-xl shadow-md p-6 mb-8">
+    <h2 class="text-lg font-medium text-gray-900 mb-4">Current Crawling Progress</h2>
+    
+    <!-- Step display -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+            <h3 class="text-sm font-medium text-gray-700 mb-2">Depth Progress</h3>
+            <div class="progress-container">
+                <div class="progress-bar" id="main-depth-progress" style="width: 0%"></div>
+            </div>
+            <div class="mt-1 flex justify-between text-xs text-gray-500">
+                <span>Current: <span id="main-current-depth">0</span></span>
+                <span>Max: <span id="main-max-depth">0</span></span>
+            </div>
+        </div>
+        <div>
+            <h3 class="text-sm font-medium text-gray-700 mb-2">Width Progress</h3>
+            <div class="progress-container">
+                <div class="progress-bar" id="main-width-progress" style="width: 0%"></div>
+            </div>
+            <div class="mt-1 flex justify-between text-xs text-gray-500">
+                <span>Current: <span id="main-current-width">0</span></span>
+                <span>Max: <span id="main-max-width">0</span></span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Current URL -->
+    <div class="mt-4">
+        <h3 class="text-sm font-medium text-gray-700 mb-1">Currently Crawling:</h3>
+        <div class="px-3 py-2 bg-gray-50 rounded-md text-sm text-gray-600 break-all" id="main-current-url">
+            Not started
+        </div>
+    </div>
+    
+    <!-- View detailed button -->
+    <div class="mt-4 text-center">
+        <button id="view-detailed-progress" class="bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-2 px-4 rounded-lg transition duration-200">
+            View Detailed Progress
+        </button>
+    </div>
+</div>

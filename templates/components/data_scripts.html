@@ -1,0 +1,14 @@
+<!-- JSON Data Scripts Component -->
+{% if results %}
+<script type="application/json" id="crawl-data">
+{{ results | tojson | safe }}
+</script>
+<script type="application/json" id="config-data">
+{
+    "seed_url": "{{ seed_url or 'http://upi.edu' }}",
+    "keyword": "{{ keyword or '' }}",
+    "total_results": {{ results|length if results else 0 }},
+    "max_depth": {{ results|map(attribute='depth')|max if results else 0 }}
+}
+</script>
+{% endif %}
