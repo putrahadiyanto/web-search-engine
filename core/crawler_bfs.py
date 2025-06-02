@@ -3,20 +3,21 @@ from urllib.parse import urljoin, urlparse # buat parsing URL (jadi bisa tahu ap
 import requests # (biar bisa request http)
 import logging # buat print timestamp
 from flask import current_app # untuk Flask context (jika digunakan dalam aplikasi Flask)
+from flask import has_app_context
 
 # ini format logging yang akan digunakan (2025-05-26 15:04:03,425 INFO __main__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s') 
 
-# ini BFS (parameternya adalah URL awal, max_depth, dan max_width)
-def bfs_crawl(start_url, max_depth=3, max_width=5, timeout=5):
+def bfs_crawl(start_url, max_depth=3, max_width=5, timeout=5, keyword=None):
     """ berfungsi untuk melakukan crawling pada website menggunakan algoritma BFS (Breadth-First Search).
     Args:
         start_url (str): URL awal untuk crawling.
         max_depth (int): Kedalaman maksimum untuk crawling.
         max_width (int): Lebar maksimum untuk crawling (jumlah link yang akan diambil pada setiap halaman).
         timeout (int): Timeout (detik) untuk request HTTP (default 5 detik).
+        keyword (str, optional): Kata kunci yang dicari pada konten halaman. Jika None, semua halaman dikembalikan.
     Returns:
-        list: Daftar hasil crawling yang berisi URL, judul halaman, kedalaman, dan parent URL.
+        list: Daftar hasil crawling yang berisi URL, judul halaman, kedalaman, dan parent URL, hanya yang mengandung keyword jika diberikan.
     """
 
     # Inisialisasi logger
@@ -96,35 +97,53 @@ def bfs_crawl(start_url, max_depth=3, max_width=5, timeout=5):
             # Jika status code tidak 200 (OK), log peringatan dan lanjut ke URL berikutnya
             if response.status_code != 200:
                 logger.warning(f"Failed to fetch {current_url} (status: {response.status_code})")
-                continue
-
-            # Parsing HTML dari response pake beautifulsoup
+                continue            # Parsing HTML dari response pake beautifulsoup
             soup = BeautifulSoup(response.text, 'html.parser')
 
             # ambil judul dari halaman (jika ada) dan strip spasi
             title = soup.title.string.strip() if soup.title and soup.title.string else ''
             
-            # Log informasi tentang judul halaman
-            logger.info(f"Adding result: {current_url} (title: {title}, depth: {depth}, width: {width}, parent: {parent})")
+            # Extract text content from the HTML with improved processing
+            # 1. Remove script and style elements
+            for script_or_style in soup(['script', 'style', 'meta', 'noscript', 'head', 'header', 'footer']):
+                script_or_style.decompose()
+                
+            # 2. Get visible text content
+            # - Using separator=' ' to replace all newlines/tabs with spaces
+            # - strip=True to remove leading and trailing whitespace
+            html_text = soup.get_text(separator=' ', strip=True)
             
-            # Tambahkan hasil crawling ke results
-            results.append({'url': current_url, 'title': title, 'depth': depth, 'width': width, 'parent': parent})
+            # 3. Normalize whitespace (replace multiple spaces with single space)
+            import re
+            html_text = re.sub(r'\s+', ' ', html_text).strip()
+            
+            # Only add to results if keyword is None or found in text (case-insensitive)
+            if not keyword or (keyword.lower() in html_text.lower()):
+                logger.info(f"Adding result: {current_url} (title: {title}, depth: {depth}, width: {width}, parent: {parent})")
+                results.append({
+                    'url': current_url, 
+                    'title': title, 
+                    'depth': depth, 
+                    'width': width, 
+                    'parent': parent,
+                    'text': html_text  # Simpan extracted text content untuk pencarian
+                })
 
             # Update CRAWL_PROGRESS if running in Flask context
             try:
-                
-                if current_app:
+                # Only update Flask app context if inside an application context
+                if has_app_context():
                     current_app.config['CRAWL_PROGRESS'] = {
                         'current_depth': depth,
-                        'current_width': min(len(queue), max_width),
+                        'current_width': width,
                         'max_depth': max_depth,
                         'max_width': max_width,
                         'current_url': current_url,
                         'total_visited': len(visited) + 1,
-                        'matched_count': len(results)  # This is just total crawled, not matches
+                        'matched_count': len(results)
                     }
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Could not update CRAWL_PROGRESS: {e}")
 
             # Tambahkan current_url ke visited
             visited.add(current_url)
@@ -191,7 +210,20 @@ def bfs_crawl(start_url, max_depth=3, max_width=5, timeout=5):
 
 # Only run this code if the file is executed directly
 if __name__ == "__main__":
-    result = bfs_crawl(start_url='http://itb.ac.id', max_depth=3, max_width=3)
+    import sys
+    keyword = None
+    url = 'http://upi.edu'
+    depth = 3
+    width = 3
+    if len(sys.argv) > 1:
+        keyword = sys.argv[1]
+    if len(sys.argv) > 2:
+        url = sys.argv[2]
+    if len(sys.argv) > 3:
+        depth = int(sys.argv[3])
+    if len(sys.argv) > 4:
+        width = int(sys.argv[4])
+    result = bfs_crawl(start_url=url, max_depth=depth, max_width=width, keyword=keyword)
     print("\nCrawl Results:")
     print("=" * 60)
     for entry in result:
@@ -200,5 +232,8 @@ if __name__ == "__main__":
         print(f"Depth  : {entry['depth']}")
         print(f"Width  : {entry['width']}")
         print(f"Parent : {entry['parent']}")
+        # Print first 150 characters of extracted text content as a preview
+        text_preview = entry['text'][:150] + "..." if len(entry['text']) > 150 else entry['text']
+        print(f"TEXT   : {text_preview}")
         print("-" * 60)
 
