@@ -214,86 +214,181 @@ function generateRoutePath(url, parent, depth, title) {
     const seedUrlElement = safeGetElement('seed_url');
     const seedUrl = seedUrlElement ? seedUrlElement.value : 'http://upi.edu';
     
-    let routePath = '';
-    
-    if (parent !== '-' && parent !== '') {
-        routePath = `
-            <div class="space-y-2">
-                <div class="flex items-start">
-                    <div class="bg-green-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
-                        <span class="text-xs font-medium text-green-800">1</span>
-                    </div>
-                    <div>
-                        <p class="text-sm font-medium">Start URL</p>
-                        <a href="${seedUrl}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">
-                            ${seedUrl}
-                        </a>
-                    </div>
-                </div>
-                <div class="ml-3 border-l-2 border-gray-200 pl-5 py-2">
-                    <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-                    </svg>
-                </div>
-                <div class="flex items-start">
-                    <div class="bg-blue-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
-                        <span class="text-xs font-medium text-blue-800">${parseInt(depth) > 1 ? '...' : '2'}</span>
-                    </div>
-                    <div>
-                        <p class="text-sm font-medium">Parent Page</p>
-                        <a href="${parent}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">${parent}</a>
-                    </div>
-                </div>
-                <div class="ml-3 border-l-2 border-gray-200 pl-5 py-2">
-                    <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-                    </svg>
-                </div>
-                <div class="flex items-start">
-                    <div class="bg-purple-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
-                        <span class="text-xs font-medium text-purple-800">${parseInt(depth) + 1}</span>
-                    </div>
-                    <div>
-                        <p class="text-sm font-medium">${title}</p>
-                        <a href="${url}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">${url}</a>
-                    </div>
-                </div>
-            </div>
-        `;
-    } else {
-        routePath = `
-            <div class="space-y-2">
-                <div class="flex items-start">
-                    <div class="bg-green-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
-                        <span class="text-xs font-medium text-green-800">1</span>
-                    </div>
-                    <div>
-                        <p class="text-sm font-medium">Start URL</p>
-                        <a href="${seedUrl}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">
-                            ${seedUrl}
-                        </a>
-                    </div>
-                </div>
-                <div class="ml-3 border-l-2 border-gray-200 pl-5 py-2">
-                    <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-                    </svg>
-                </div>
-                <div class="flex items-start">
-                    <div class="bg-purple-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
-                        <span class="text-xs font-medium text-purple-800">2</span>
-                    </div>
-                    <div>
-                        <p class="text-sm font-medium">${title}</p>
-                        <a href="${url}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">${url}</a>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
+    // Build the complete path by finding all parents
+    const fullPath = buildCompleteRoutePath(url, parent, depth, title, seedUrl);
+    const routePath = renderRoutePath(fullPath);
     
     if (routeLoading) routeLoading.classList.add('hidden');
     if (routePathContent) routePathContent.innerHTML = routePath;
+}
+
+function buildCompleteRoutePath(url, parent, depth, title, seedUrl) {
+    const crawlData = loadJSONData('crawl-data');
+    const path = [];
+    
+    // Start with the current page
+    let currentPage = {
+        url: url,
+        title: title,
+        parent: parent,
+        depth: parseInt(depth)
+    };
+    
+    // Build the path backwards from current page to root
+    while (currentPage) {
+        path.unshift(currentPage);
+        
+        if (!currentPage.parent || currentPage.parent === '-' || currentPage.parent === seedUrl) {
+            // Reached the root, add seed URL if not already there
+            if (currentPage.url !== seedUrl) {
+                path.unshift({
+                    url: seedUrl,
+                    title: 'Start URL',
+                    parent: null,
+                    depth: 0
+                });
+            }
+            break;
+        }
+        
+        // Find the parent in crawl data
+        if (crawlData) {
+            const parentPage = crawlData.find(page => page.url === currentPage.parent);
+            if (parentPage) {
+                currentPage = {
+                    url: parentPage.url,
+                    title: parentPage.title || parentPage.url,
+                    parent: parentPage.parent,
+                    depth: parentPage.depth
+                };
+            } else {
+                // Parent not found in data, add it manually if it's not the seed URL
+                if (currentPage.parent !== seedUrl) {
+                    path.unshift({
+                        url: currentPage.parent,
+                        title: getUrlTitle(currentPage.parent),
+                        parent: null,
+                        depth: currentPage.depth - 1
+                    });
+                }
+                // Add seed URL at the beginning
+                if (path[0].url !== seedUrl) {
+                    path.unshift({
+                        url: seedUrl,
+                        title: 'Start URL',
+                        parent: null,
+                        depth: 0
+                    });
+                }
+                break;
+            }
+        } else {
+            // No crawl data available, just add the parent and seed URL
+            if (currentPage.parent !== seedUrl) {
+                path.unshift({
+                    url: currentPage.parent,
+                    title: getUrlTitle(currentPage.parent),
+                    parent: null,
+                    depth: currentPage.depth - 1
+                });
+            }
+            // Add seed URL at the beginning
+            if (path[0].url !== seedUrl) {
+                path.unshift({
+                    url: seedUrl,
+                    title: 'Start URL',
+                    parent: null,
+                    depth: 0
+                });
+            }
+            break;
+        }
+    }
+    
+    return path;
+}
+
+function getUrlTitle(url) {
+    // Extract a readable title from URL
+    try {
+        const urlObj = new URL(url);
+        const pathParts = urlObj.pathname.split('/').filter(part => part.length > 0);
+        if (pathParts.length > 0) {
+            return pathParts[pathParts.length - 1].replace(/[-_]/g, ' ').replace(/\.[^/.]+$/, '');
+        }
+        return urlObj.hostname;
+    } catch (e) {
+        return url;
+    }
+}
+
+function renderRoutePath(pathArray) {
+    if (!pathArray || pathArray.length === 0) {
+        return '<p class="text-center text-gray-500">No path information available</p>';
+    }
+    
+    let routePath = '<div class="space-y-2">';
+    
+    pathArray.forEach((page, index) => {
+        const isFirst = index === 0;
+        const isLast = index === pathArray.length - 1;
+        const stepNumber = index + 1;
+        
+        // Determine the color scheme based on position
+        let colorClass, bgClass;
+        if (isFirst) {
+            colorClass = 'text-green-800';
+            bgClass = 'bg-green-100';
+        } else if (isLast) {
+            colorClass = 'text-purple-800';
+            bgClass = 'bg-purple-100';
+        } else {
+            colorClass = 'text-blue-800';
+            bgClass = 'bg-blue-100';
+        }
+        
+        // Add the page step
+        routePath += `
+            <div class="flex items-start">
+                <div class="${bgClass} rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
+                    <span class="text-xs font-medium ${colorClass}">${stepNumber}</span>
+                </div>
+                <div class="flex-1">
+                    <p class="text-sm font-medium">${page.title}</p>
+                    <a href="${page.url}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">
+                        ${page.url}
+                    </a>
+                    ${page.depth !== undefined ? `<span class="text-xs text-gray-500 ml-2">Depth: ${page.depth}</span>` : ''}
+                </div>
+            </div>
+        `;
+        
+        // Add arrow between steps (except for the last one)
+        if (!isLast) {
+            routePath += `
+                <div class="ml-3 border-l-2 border-gray-200 pl-5 py-2">
+                    <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                    </svg>
+                </div>
+            `;
+        }
+    });
+    
+    routePath += '</div>';
+    
+    // Add summary information
+    routePath += `
+        <div class="mt-4 pt-4 border-t border-gray-200">
+            <div class="text-xs text-gray-600 space-y-1">
+                <p><span class="font-medium">Total Steps:</span> ${pathArray.length}</p>
+                <p><span class="font-medium">Final Depth:</span> ${pathArray[pathArray.length - 1].depth || 'N/A'}</p>
+                <p><span class="font-medium">Path Type:</span> ${pathArray.length === 2 ? 'Direct' : 'Multi-level'}</p>
+            </div>
+        </div>
+    `;
+    
+    return routePath;
 }
 
 function updateProgressDisplay(data) {

@@ -29,6 +29,35 @@ body {
     border-radius: 0.5rem;
 }
 
+/* Route Path Styles */
+.route-step {
+    transition: all 0.2s ease;
+}
+
+.route-step:hover {
+    background-color: #f9fafb;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    margin: -0.5rem;
+}
+
+.route-step-number {
+    min-width: 24px;
+    min-height: 24px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.route-arrow {
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.route-step:hover + .route-arrow,
+.route-arrow:hover {
+    opacity: 1;
+}
+
 /* D3.js Tree Styles */
 .tree-container {
     background: white;
