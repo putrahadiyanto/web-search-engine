@@ -1,0 +1,41 @@
+<!-- Search Form Component -->
+<div class="bg-white rounded-xl shadow-md p-6 mb-8">
+    <form method="post" action="/" class="space-y-6">
+        <div>
+            <label for="seed_url" class="block text-sm font-medium text-gray-700 mb-1">Seed URL</label>
+            <input type="url" id="seed_url" name="seed_url" required
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="https://example.com" value="{{ seed_url }}">
+        </div>
+
+        <div>
+            <label for="keyword" class="block text-sm font-medium text-gray-700 mb-1">Keyword</label>
+            <input type="text" id="keyword" name="keyword" required
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter search keyword" value="{{ keyword }}">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label for="depth_limit" class="block text-sm font-medium text-gray-700 mb-1">Depth Limit</label>
+                <input type="number" id="depth_limit" name="depth_limit" min="1" value="{{ depth_limit or 3 }}" required
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+                <label for="width_limit" class="block text-sm font-medium text-gray-700 mb-1">Width Limit</label>
+                <input type="number" id="width_limit" name="width_limit" min="1" value="{{ width_limit or 5 }}" required
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+        </div>
+
+        <div class="text-center">
+            <button type="submit"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition duration-200">
+                Start Crawling
+            </button>
+        </div>
+        <div class="mt-4 text-center text-sm text-gray-500">
+            <p>Default values will be used if not specified: URL = http://upi.edu, Depth = 3, Width = 5</p>
+        </div>
+    </form>
+</div>

@@ -1,0 +1,174 @@
+/* Web Crawler Main Styles */
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+.modal {
+    transition: opacity 0.25s ease;
+}
+
+.modal-active {
+    overflow-x: hidden;
+    overflow-y: visible !important;
+}
+
+.progress-container {
+    background: #f3f4f6;
+    border-radius: 0.5rem;
+    height: 1.5rem;
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-bar {
+    background: #3b82f6;
+    height: 100%;
+    position: absolute;
+    transition: width 0.3s ease;
+    border-radius: 0.5rem;
+}
+
+/* D3.js Tree Styles */
+.tree-container {
+    background: white;
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+    overflow: hidden;
+}
+
+.node circle {
+    fill: #3b82f6;
+    stroke: #1e40af;
+    stroke-width: 2px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.node circle:hover {
+    fill: #1d4ed8;
+    stroke: #1e3a8a;
+    stroke-width: 3px;
+}
+
+.node.root circle {
+    fill: #10b981;
+    stroke: #059669;
+}
+
+.node.leaf circle {
+    fill: #f59e0b;
+    stroke: #d97706;
+}
+
+.node text {
+    font: 12px 'Inter', sans-serif;
+    fill: #374151;
+    cursor: pointer;
+}
+
+.node text:hover {
+    fill: #1f2937;
+    font-weight: 500;
+}
+
+.link {
+    fill: none;
+    stroke: #9ca3af;
+    stroke-width: 2px;
+    stroke-opacity: 0.6;
+}
+
+.link:hover {
+    stroke: #6b7280;
+    stroke-width: 3px;
+    stroke-opacity: 0.8;
+}
+
+.tree-controls {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.tree-legend {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.875rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.legend-circle {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid;
+}
+
+.legend-root {
+    background: #10b981;
+    border-color: #059669;
+}
+
+.legend-internal {
+    background: #3b82f6;
+    border-color: #1e40af;
+}
+
+.legend-leaf {
+    background: #f59e0b;
+    border-color: #d97706;
+}
+
+.tab-button {
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.tab-button.active {
+    background: #3b82f6;
+    color: white;
+}
+
+.tab-button:not(.active) {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.tab-button:not(.active):hover {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    pointer-events: none;
+    z-index: 1000;
+    max-width: 300px;
+    word-wrap: break-word;
+}

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Web Crawler Engine{% endblock %}</title>
+    
+    <!-- External CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    
+    <!-- External JavaScript -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    
+    {% block head %}{% endblock %}
+</head>
+
+<body class="bg-slate-50 min-h-screen">
+    <div class="container mx-auto px-4 py-12 max-w-6xl">
+        {% block content %}{% endblock %}
+    </div>
+
+    {% block footer %}
+    <footer class="mt-12 text-center text-sm text-gray-500 pb-6">
+        <p>© 2023 Web Crawler - Analisis dan Desain Algoritma</p>
+    </footer>
+    {% endblock %}
+
+    {% block modals %}{% endblock %}
+    
+    <!-- Tooltip for tree visualization -->
+    <div id="tree-tooltip" class="tooltip" style="display: none;"></div>
+
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>
