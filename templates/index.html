@@ -7,7 +7,24 @@
     <title>Web Crawler Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- JSON Data Script Tag - Separate Jinja2 from JavaScript -->
+    {% if results %}
+    <script type="application/json" id="crawl-data">
+    {{ results | tojson | safe }}
+    </script>
+    <script type="application/json" id="config-data">
+    {
+        "seed_url": "{{ seed_url or 'http://upi.edu' }}",
+        "keyword": "{{ keyword or '' }}",
+        "total_results": {{ results|length if results else 0 }},
+        "max_depth": {{ results|map(attribute='depth')|max if results else 0 }}
+    }
+    </script>
+    {% endif %}
+    
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -38,11 +55,156 @@
             transition: width 0.3s ease;
             border-radius: 0.5rem;
         }
+
+        /* D3.js Tree Styles */
+        .tree-container {
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .node circle {
+            fill: #3b82f6;
+            stroke: #1e40af;
+            stroke-width: 2px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .node circle:hover {
+            fill: #1d4ed8;
+            stroke: #1e3a8a;
+            stroke-width: 3px;
+        }
+
+        .node.root circle {
+            fill: #10b981;
+            stroke: #059669;
+        }
+
+        .node.leaf circle {
+            fill: #f59e0b;
+            stroke: #d97706;
+        }
+
+        .node text {
+            font: 12px 'Inter', sans-serif;
+            fill: #374151;
+            cursor: pointer;
+        }
+
+        .node text:hover {
+            fill: #1f2937;
+            font-weight: 500;
+        }
+
+        .link {
+            fill: none;
+            stroke: #9ca3af;
+            stroke-width: 2px;
+            stroke-opacity: 0.6;
+        }
+
+        .link:hover {
+            stroke: #6b7280;
+            stroke-width: 3px;
+            stroke-opacity: 0.8;
+        }
+
+        .tree-controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .tree-legend {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            font-size: 0.875rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .legend-circle {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid;
+        }
+
+        .legend-root {
+            background: #10b981;
+            border-color: #059669;
+        }
+
+        .legend-internal {
+            background: #3b82f6;
+            border-color: #1e40af;
+        }
+
+        .legend-leaf {
+            background: #f59e0b;
+            border-color: #d97706;
+        }
+
+        .tab-button {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .tab-button.active {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .tab-button:not(.active) {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .tab-button:not(.active):hover {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 300px;
+            word-wrap: break-word;
+        }
     </style>
 </head>
 
 <body class="bg-slate-50 min-h-screen">
-    <div class="container mx-auto px-4 py-12 max-w-4xl">        <!-- Header -->
+    <div class="container mx-auto px-4 py-12 max-w-6xl">
+        <!-- Header -->
         <header class="text-center mb-12">
             <h1 class="text-4xl font-bold text-blue-600 mb-2">Web Crawler</h1>
             <p class="text-slate-500">Search and analyze web content efficiently</p>
@@ -58,8 +220,8 @@
 
         <!-- Search Form -->
         <div class="bg-white rounded-xl shadow-md p-6 mb-8">
-            <!-- Update form action to point to /submit -->
-            <form method="post" action="/" class="space-y-6">                <div>
+            <form method="post" action="/" class="space-y-6">
+                <div>
                     <label for="seed_url" class="block text-sm font-medium text-gray-700 mb-1">Seed URL</label>
                     <input type="url" id="seed_url" name="seed_url" required
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -73,18 +235,20 @@
                         placeholder="Enter search keyword" value="{{ keyword }}">
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">                    <div>
-                        <label for="depth_limit" class="block text-sm font-medium text-gray-700 mb-1">Depth
-                            Limit</label>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="depth_limit" class="block text-sm font-medium text-gray-700 mb-1">Depth Limit</label>
                         <input type="number" id="depth_limit" name="depth_limit" min="1" value="{{ depth_limit or 3 }}" required
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    </div>                    <div>
-                        <label for="width_limit" class="block text-sm font-medium text-gray-700 mb-1">Width
-                            Limit</label>
+                    </div>
+                    <div>
+                        <label for="width_limit" class="block text-sm font-medium text-gray-700 mb-1">Width Limit</label>
                         <input type="number" id="width_limit" name="width_limit" min="1" value="{{ width_limit or 5 }}" required
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
-                </div>            <div class="text-center">
+                </div>
+
+                <div class="text-center">
                     <button type="submit"
                         class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition duration-200">
                         Start Crawling
@@ -93,7 +257,8 @@
                 <div class="mt-4 text-center text-sm text-gray-500">
                     <p>Default values will be used if not specified: URL = http://upi.edu, Depth = 3, Width = 5</p>
                 </div>
-            </form>        </div>
+            </form>
+        </div>
         
         <!-- Progress Indicator -->
         <div id="loading" class="hidden bg-blue-50 border-l-4 border-blue-500 p-4 mb-8 rounded shadow-sm">
@@ -150,12 +315,132 @@
             </div>
         </div>
         
-        <!-- Results Section -->
+        <!-- Results Section with Tabs -->
+        {% if results %}
+        <div class="bg-white rounded-xl shadow-md overflow-hidden mb-8">
+            <div class="border-b border-gray-200 bg-gray-50 px-4 py-3">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-medium text-gray-900">Search Results</h2>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        {{ results|length }} matches
+                    </span>
+                </div>
+                
+                <!-- Tab Navigation -->
+                <div class="flex space-x-1">
+                    <button class="tab-button active" data-tab="tree-view">
+                        <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        Tree View
+                    </button>
+                    <button class="tab-button" data-tab="list-view">
+                        <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                        </svg>
+                        List View
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tree Visualization Tab -->
+            <div id="tree-view" class="tab-content active p-6">
+                <!-- Tree Legend -->
+                <div class="tree-legend mb-4">
+                    <div class="legend-item">
+                        <div class="legend-circle legend-root"></div>
+                        <span>Root Page</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-circle legend-internal"></div>
+                        <span>Internal Page</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-circle legend-leaf"></div>
+                        <span>Leaf Page</span>
+                    </div>
+                </div>
+
+                <!-- Tree Controls -->
+                <div class="tree-controls mb-4">
+                    <button id="expand-all" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded text-sm font-medium transition duration-200">
+                        Expand All
+                    </button>
+                    <button id="collapse-all" class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded text-sm font-medium transition duration-200">
+                        Collapse All
+                    </button>
+                    <button id="center-tree" class="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-1 rounded text-sm font-medium transition duration-200">
+                        Center Tree
+                    </button>
+                    <button id="fit-to-screen" class="bg-purple-100 hover:bg-purple-200 text-purple-800 px-3 py-1 rounded text-sm font-medium transition duration-200">
+                        Fit to Screen
+                    </button>
+                </div>
+
+                <!-- Tree Container -->
+                <div id="tree-visualization" class="w-full h-96 border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                    <svg id="tree-svg" width="100%" height="100%"></svg>
+                </div>
+
+                <!-- Tree Info -->
+                <div class="mt-4 text-sm text-gray-600">
+                    <p><strong>Instructions:</strong> Click nodes to expand/collapse, hover for details, drag to pan, scroll to zoom</p>
+                    <p><strong>Total Pages:</strong> <span id="total-pages">{{ results|length }}</span> | 
+                       <strong>Max Depth:</strong> <span id="max-depth">{{ results|map(attribute='depth')|max if results else 0 }}</span></p>
+                </div>
+            </div>
+
+            <!-- List View Tab -->
+            <div id="list-view" class="tab-content">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                    {% for result in results %}
+                    <div class="bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow p-4">
+                        <h3 class="text-lg font-medium text-blue-600 mb-2">
+                            <a href="{{ result.url }}" target="_blank" class="hover:underline">{{ result.title }}</a>
+                        </h3>
+                        <p class="text-sm text-gray-500 mt-1 break-all">{{ result.url }}</p>
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                                Depth: {{ result.depth }}
+                            </span>
+                            {% if result.parent %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700">
+                                Parent URL
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="mt-4 flex flex-col">
+                            {% if result.parent %}
+                            <p class="text-xs text-gray-500 mb-2">Parent: <a href="{{ result.parent }}" class="text-blue-500 hover:underline break-all">{{ result.parent }}</a></p>
+                            {% endif %}
+                            <button 
+                                data-url="{{ result.url }}"
+                                data-depth="{{ result.depth }}"
+                                data-parent="{{ result.parent or '' }}"
+                                data-title="{{ result.title }}"
+                                class="view-route-btn mt-2 bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-medium py-1.5 px-3 rounded transition duration-200 self-start">
+                                View Route
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- No results message -->
+                {% if results|length == 0 %}
+                <div class="p-8 text-center">
+                    <p class="text-gray-500">No results found for "{{ keyword }}"</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Search Status Section -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden mb-8">
             <div class="border-b border-gray-200 bg-gray-50 px-4 py-3 flex justify-between items-center">
                 <h2 class="text-lg font-medium text-gray-900">Search Status</h2>
-                <span
-                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                     Info
                 </span>
             </div>
@@ -171,64 +456,19 @@
                 {% endif %}
             </div>
         </div>
-          <!-- Search Results -->
-        {% if results %}
-        <div class="bg-white rounded-xl shadow-md overflow-hidden">
-            <div class="border-b border-gray-200 bg-gray-50 px-4 py-3 flex justify-between items-center">
-                <h2 class="text-lg font-medium text-gray-900">Search Results</h2>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    {{ results|length }} matches
-                </span>
-            </div>            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-                {% for result in results %}
-                <div class="bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow p-4">
-                    <h3 class="text-lg font-medium text-blue-600 mb-2">
-                        <a href="{{ result.url }}" target="_blank" class="hover:underline">{{ result.title }}</a>
-                    </h3>
-                    <p class="text-sm text-gray-500 mt-1 break-all">{{ result.url }}</p>
-                    <div class="mt-4 flex flex-wrap gap-2">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-                            Depth: {{ result.depth }}
-                        </span>
-                        {% if result.parent %}
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700">
-                            Parent URL
-                        </span>
-                        {% endif %}
-                    </div>
-                    <div class="mt-4 flex flex-col">
-                        {% if result.parent %}
-                        <p class="text-xs text-gray-500 mb-2">Parent: <a href="{{ result.parent }}" class="text-blue-500 hover:underline break-all">{{ result.parent }}</a></p>
-                        {% endif %}
-                        <button 
-                            data-url="{{ result.url }}"
-                            data-depth="{{ result.depth }}"
-                            data-parent="{{ result.parent or '' }}"
-                            data-title="{{ result.title }}"
-                            class="view-route-btn mt-2 bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-medium py-1.5 px-3 rounded transition duration-200 self-start">
-                            View Route
-                        </button>
-                    </div>                </div>
-                {% endfor %}
-            </div>
-            
-            <!-- No results message -->
-            {% if results|length == 0 %}
-            <div class="p-8 text-center">
-                <p class="text-gray-500">No results found for "{{ keyword }}"</p>
-            </div>
-            {% endif %}
-        </div>
-        {% endif %}
-    </div>    <footer class="mt-12 text-center text-sm text-gray-500 pb-6">
+    </div>
+
+    <footer class="mt-12 text-center text-sm text-gray-500 pb-6">
         <p>© 2023 Web Crawler - Analisis dan Desain Algoritma</p>
-    </footer>    <!-- Route Details Modal -->
+    </footer>
+
+    <!-- Route Details Modal -->
     <div id="search-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
         <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
         
         <div class="modal-container bg-white w-11/12 md:max-w-md mx-auto rounded shadow-lg z-50 overflow-y-auto">
-            <div class="modal-content py-4 text-left px-6">                <!-- Modal Header -->
+            <div class="modal-content py-4 text-left px-6">
+                <!-- Modal Header -->
                 <div class="flex justify-between items-center pb-3">
                     <p class="text-2xl font-bold">Route Details</p>
                     <div class="modal-close cursor-pointer z-50" id="close-modal">
@@ -330,56 +570,177 @@
                 </div>
             </div>
         </div>
-    </div>    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.querySelector('form');
-            const loading = document.getElementById('loading');
-            
-            // Main form submission
-            form.addEventListener('submit', function() {
-                const keyword = document.getElementById('keyword').value;
-                
-                if (!keyword.trim()) {
-                    // Prevent form submission if no keyword
-                    event.preventDefault();
-                    return false;
+    </div>
+
+    <!-- Tooltip for tree visualization -->
+    <div id="tree-tooltip" class="tooltip" style="display: none;"></div>
+
+    <script>
+        // Global variables for tree visualization
+        let treeData = null;
+        let svg, g, tree, root;
+        let width = 800, height = 400;
+        let i = 0;
+        const duration = 750;
+
+        // Helper function to safely get element
+        function safeGetElement(id) {
+            const element = document.getElementById(id);
+            if (!element) {
+                console.warn(`Element with id '${id}' not found`);
+            }
+            return element;
+        }
+
+        // Helper function to safely load JSON data
+        function loadJSONData(id) {
+            try {
+                const dataElement = document.getElementById(id);
+                if (!dataElement) {
+                    console.warn(`JSON data element '${id}' not found`);
+                    return null;
                 }
-                
-                loading.classList.remove('hidden');
-                
-                // Show progress modal
-                document.getElementById('progress-modal').classList.remove('opacity-0', 'pointer-events-none');
-                
-                // Start progress tracking
-                startProgressTracking();
+                return JSON.parse(dataElement.textContent);
+            } catch (error) {
+                console.error(`Error parsing JSON data from '${id}':`, error);
+                return null;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing...');
+            
+            const form = document.querySelector('form');
+            const loading = safeGetElement('loading');
+            
+            // Initialize tree visualization if data exists
+            const crawlData = loadJSONData('crawl-data');
+            const configData = loadJSONData('config-data');
+            
+            if (crawlData && crawlData.length > 0) {
+                console.log('Crawl data found, initializing tree visualization...');
+                initializeTreeVisualization(crawlData, configData);
+            } else {
+                console.log('No crawl data found, skipping tree visualization');
+            }
+            
+            // Tab switching functionality
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', function() {
+                    const targetTab = this.dataset.tab;
+                    
+                    // Update button states
+                    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Update content visibility
+                    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                    const targetContent = safeGetElement(targetTab);
+                    if (targetContent) {
+                        targetContent.classList.add('active');
+                    }
+                    
+                    // Refresh tree if switching to tree view
+                    if (targetTab === 'tree-view' && treeData) {
+                        setTimeout(() => {
+                            refreshTreeVisualization();
+                        }, 100);
+                    }
+                });
             });
             
+            // Main form submission
+            if (form) {
+                form.addEventListener('submit', function(event) {
+                    const keywordElement = safeGetElement('keyword');
+                    const keyword = keywordElement ? keywordElement.value : '';
+                    
+                    if (!keyword.trim()) {
+                        event.preventDefault();
+                        alert('Please enter a keyword to search');
+                        return false;
+                    }
+                    
+                    if (loading) {
+                        loading.classList.remove('hidden');
+                    }
+                    
+                    const progressModal = safeGetElement('progress-modal');
+                    if (progressModal) {
+                        progressModal.classList.remove('opacity-0', 'pointer-events-none');
+                    }
+                    
+                    startProgressTracking();
+                });
+            }
+            
             // Modal functionality
-            const modalOpenBtn = document.getElementById('modal-open-btn');
-            const closeModalBtn = document.getElementById('close-modal');
-            const closeProgressModalBtn = document.getElementById('close-progress-modal');
-            const modal = document.getElementById('search-modal');
-            const progressModal = document.getElementById('progress-modal');
-            const overlay = document.querySelector('.modal-overlay');
-            const viewDetailedBtn = document.getElementById('view-detailed-progress');
+            setupModalHandlers();
+            
+            // View Route button click handlers
+            setupRouteButtonHandlers();
+            
+            // Progress tracking function
+            function startProgressTracking() {
+                const progressInterval = setInterval(function() {
+                    fetch('/get_progress')
+                        .then(response => response.json())
+                        .then(data => {
+                            updateProgressDisplay(data);
+                            
+                            if (data.total_visited > 0 && data.current_depth >= data.max_depth) {
+                                if (loading) {
+                                    loading.classList.add('hidden');
+                                }
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error fetching progress:', error);
+                        });
+                }, 100);
+                
+                window.progressInterval = progressInterval;
+                
+                setTimeout(function() {
+                    if (window.progressInterval) {
+                        clearInterval(window.progressInterval);
+                    }
+                }, 5 * 60 * 1000);
+            }
+        });
+
+        function setupModalHandlers() {
+            const modalOpenBtn = safeGetElement('modal-open-btn');
+            const closeModalBtn = safeGetElement('close-modal');
+            const closeProgressModalBtn = safeGetElement('close-progress-modal');
+            const modal = safeGetElement('search-modal');
+            const progressModal = safeGetElement('progress-modal');
+            const viewDetailedBtn = safeGetElement('view-detailed-progress');
             
             // Open detailed progress modal
             if (viewDetailedBtn) {
                 viewDetailedBtn.addEventListener('click', function() {
-                    progressModal.classList.remove('opacity-0', 'pointer-events-none');
+                    if (progressModal) {
+                        progressModal.classList.remove('opacity-0', 'pointer-events-none');
+                    }
                 });
             }
             
             // Close modals
-            closeModalBtn.addEventListener('click', function() {
-                modal.classList.add('opacity-0', 'pointer-events-none');
-            });
+            if (closeModalBtn && modal) {
+                closeModalBtn.addEventListener('click', function() {
+                    modal.classList.add('opacity-0', 'pointer-events-none');
+                });
+            }
             
-            closeProgressModalBtn.addEventListener('click', function() {
-                progressModal.classList.add('opacity-0', 'pointer-events-none');
-            });
-            
-            // View Route button click handlers
+            if (closeProgressModalBtn && progressModal) {
+                closeProgressModalBtn.addEventListener('click', function() {
+                    progressModal.classList.add('opacity-0', 'pointer-events-none');
+                });
+            }
+        }
+
+        function setupRouteButtonHandlers() {
             document.addEventListener('click', function(event) {
                 if (event.target.classList.contains('view-route-btn') || 
                     event.target.closest('.view-route-btn')) {
@@ -388,167 +749,521 @@
                                    event.target : 
                                    event.target.closest('.view-route-btn');
                     
-                    // Get data from button attributes
                     const url = button.dataset.url;
                     const parent = button.dataset.parent || '-';
                     const depth = button.dataset.depth || '0';
                     const title = button.dataset.title || url;
                     
-                    // Set route details in modal
-                    document.getElementById('route-url').textContent = url;
-                    document.getElementById('route-parent').textContent = parent !== '-' ? parent : 'None';
-                    document.getElementById('route-depth').textContent = depth;
-                    
-                    // Show loading indicator
-                    document.getElementById('route-loading').classList.remove('hidden');
-                    document.getElementById('route-path-content').innerHTML = 
-                        '<p class="text-center text-gray-500">Loading path information...</p>';
-                    
-                    // Open the modal
-                    modal.classList.remove('opacity-0', 'pointer-events-none');
-                    
-                    // For demonstration, generate a path based on what we know
-                    // In a real application, this would come from the server
-                    setTimeout(() => {
-                        let routePath = '';
-                        
-                        if (parent !== '-' && parent !== '') {
-                            routePath = `
-                                <div class="space-y-2">
-                                    <div class="flex items-start">
-                                        <div class="bg-green-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
-                                            <span class="text-xs font-medium text-green-800">1</span>
-                                        </div>
-                                        <div>
-                                            <p class="text-sm font-medium">Start URL</p>
-                                            <a href="${document.getElementById('seed_url').value}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">
-                                                ${document.getElementById('seed_url').value}
-                                            </a>
-                                        </div>
-                                    </div>
-                                    <div class="ml-3 border-l-2 border-gray-200 pl-5 py-2">
-                                        <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-                                        </svg>
-                                    </div>
-                                    <div class="flex items-start">
-                                        <div class="bg-blue-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
-                                            <span class="text-xs font-medium text-blue-800">${parseInt(depth) > 1 ? '...' : '2'}</span>
-                                        </div>
-                                        <div>
-                                            <p class="text-sm font-medium">Parent Page</p>
-                                            <a href="${parent}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">${parent}</a>
-                                        </div>
-                                    </div>
-                                    <div class="ml-3 border-l-2 border-gray-200 pl-5 py-2">
-                                        <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-                                        </svg>
-                                    </div>
-                                    <div class="flex items-start">
-                                        <div class="bg-purple-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
-                                            <span class="text-xs font-medium text-purple-800">${parseInt(depth) + 1}</span>
-                                        </div>
-                                        <div>
-                                            <p class="text-sm font-medium">${title}</p>
-                                            <a href="${url}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">${url}</a>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        } else {
-                            routePath = `
-                                <div class="space-y-2">
-                                    <div class="flex items-start">
-                                        <div class="bg-green-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
-                                            <span class="text-xs font-medium text-green-800">1</span>
-                                        </div>
-                                        <div>
-                                            <p class="text-sm font-medium">Start URL</p>
-                                            <a href="${document.getElementById('seed_url').value}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">
-                                                ${document.getElementById('seed_url').value}
-                                            </a>
-                                        </div>
-                                    </div>
-                                    <div class="ml-3 border-l-2 border-gray-200 pl-5 py-2">
-                                        <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-                                        </svg>
-                                    </div>
-                                    <div class="flex items-start">
-                                        <div class="bg-purple-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
-                                            <span class="text-xs font-medium text-purple-800">2</span>
-                                        </div>
-                                        <div>
-                                            <p class="text-sm font-medium">${title}</p>
-                                            <a href="${url}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">${url}</a>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        }
-                        
-                        // Hide loading and show results
-                        document.getElementById('route-loading').classList.add('hidden');
-                        document.getElementById('route-path-content').innerHTML = routePath;
-                    }, 500);
+                    displayRouteDetails(url, parent, depth, title);
                 }
-            });              
-            // Progress tracking function
-            function startProgressTracking() {
-                const progressInterval = setInterval(function() {
-                    fetch('/get_progress')
-                        .then(response => response.json())
-                        .then(data => {
-                            // Calculate percentages
-                            const depthPercent = data.max_depth ? (data.current_depth / data.max_depth) * 100 : 0;
-                            const widthPercent = data.max_width ? (data.current_width / data.max_width) * 100 : 0;
-                            
-                            // Update modal depth progress
-                            const depthBar = document.getElementById('depth-progress-bar');
-                            const depthText = document.getElementById('depth-progress-text');
-                            depthBar.style.width = depthPercent + '%';
-                            depthText.textContent = data.current_depth + '/' + data.max_depth;
-                            
-                            // Update modal width progress
-                            const widthBar = document.getElementById('width-progress-bar');
-                            const widthText = document.getElementById('width-progress-text');
-                            widthBar.style.width = widthPercent + '%';
-                            widthText.textContent = data.current_width + '/' + data.max_width;
-                            
-                            // Update modal current URL and stats
-                            document.getElementById('current-url').textContent = data.current_url || '-';
-                            document.getElementById('pages-visited').textContent = data.total_visited;
-                            document.getElementById('matches-found').textContent = data.matched_count;
-                            
-                            // Update main page progress indicators
-                            document.getElementById('main-depth-progress').style.width = depthPercent + '%';
-                            document.getElementById('main-width-progress').style.width = widthPercent + '%';
-                            document.getElementById('main-current-depth').textContent = data.current_depth;
-                            document.getElementById('main-max-depth').textContent = data.max_depth;
-                            document.getElementById('main-current-width').textContent = data.current_width;
-                            document.getElementById('main-max-width').textContent = data.max_width;
-                            document.getElementById('main-current-url').textContent = data.current_url || 'Not started';
-                            
-                            // If crawling is done, hide loading indicator
-                            if (data.total_visited > 0 && data.current_depth >= data.max_depth) {
-                                loading.classList.add('hidden');
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error fetching progress:', error);
-                        });
-                }, 100); // Update every second
+            });
+        }
+
+        function displayRouteDetails(url, parent, depth, title) {
+            const modal = safeGetElement('search-modal');
+            const routeUrl = safeGetElement('route-url');
+            const routeParent = safeGetElement('route-parent');
+            const routeDepth = safeGetElement('route-depth');
+            const routeLoading = safeGetElement('route-loading');
+            const routePathContent = safeGetElement('route-path-content');
+            
+            if (routeUrl) routeUrl.textContent = url;
+            if (routeParent) routeParent.textContent = parent !== '-' ? parent : 'None';
+            if (routeDepth) routeDepth.textContent = depth;
+            
+            if (routeLoading) routeLoading.classList.remove('hidden');
+            if (routePathContent) {
+                routePathContent.innerHTML = '<p class="text-center text-gray-500">Loading path information...</p>';
+            }
+            
+            if (modal) {
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+            }
+            
+            setTimeout(() => {
+                generateRoutePath(url, parent, depth, title);
+            }, 500);
+        }
+
+        function generateRoutePath(url, parent, depth, title) {
+            const routeLoading = safeGetElement('route-loading');
+            const routePathContent = safeGetElement('route-path-content');
+            const seedUrlElement = safeGetElement('seed_url');
+            const seedUrl = seedUrlElement ? seedUrlElement.value : 'http://upi.edu';
+            
+            let routePath = '';
+            
+            if (parent !== '-' && parent !== '') {
+                routePath = `
+                    <div class="space-y-2">
+                        <div class="flex items-start">
+                            <div class="bg-green-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
+                                <span class="text-xs font-medium text-green-800">1</span>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium">Start URL</p>
+                                <a href="${seedUrl}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">
+                                    ${seedUrl}
+                                </a>
+                            </div>
+                        </div>
+                        <div class="ml-3 border-l-2 border-gray-200 pl-5 py-2">
+                            <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                            </svg>
+                        </div>
+                        <div class="flex items-start">
+                            <div class="bg-blue-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
+                                <span class="text-xs font-medium text-blue-800">${parseInt(depth) > 1 ? '...' : '2'}</span>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium">Parent Page</p>
+                                <a href="${parent}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">${parent}</a>
+                            </div>
+                        </div>
+                        <div class="ml-3 border-l-2 border-gray-200 pl-5 py-2">
+                            <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                            </svg>
+                        </div>
+                        <div class="flex items-start">
+                            <div class="bg-purple-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
+                                <span class="text-xs font-medium text-purple-800">${parseInt(depth) + 1}</span>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium">${title}</p>
+                                <a href="${url}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">${url}</a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                routePath = `
+                    <div class="space-y-2">
+                        <div class="flex items-start">
+                            <div class="bg-green-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
+                                <span class="text-xs font-medium text-green-800">1</span>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium">Start URL</p>
+                                <a href="${seedUrl}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">
+                                    ${seedUrl}
+                                </a>
+                            </div>
+                        </div>
+                        <div class="ml-3 border-l-2 border-gray-200 pl-5 py-2">
+                            <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                            </svg>
+                        </div>
+                        <div class="flex items-start">
+                            <div class="bg-purple-100 rounded-full flex items-center justify-center h-6 w-6 flex-shrink-0 mr-2">
+                                <span class="text-xs font-medium text-purple-800">2</span>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium">${title}</p>
+                                <a href="${url}" target="_blank" class="text-xs text-blue-600 hover:underline break-all">${url}</a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            if (routeLoading) routeLoading.classList.add('hidden');
+            if (routePathContent) routePathContent.innerHTML = routePath;
+        }
+
+        function updateProgressDisplay(data) {
+            const depthPercent = data.max_depth ? (data.current_depth / data.max_depth) * 100 : 0;
+            const widthPercent = data.max_width ? (data.current_width / data.max_width) * 100 : 0;
+            
+            // Update modal elements
+            const elements = {
+                'depth-progress-bar': elem => elem.style.width = depthPercent + '%',
+                'depth-progress-text': elem => elem.textContent = data.current_depth + '/' + data.max_depth,
+                'width-progress-bar': elem => elem.style.width = widthPercent + '%',
+                'width-progress-text': elem => elem.textContent = data.current_width + '/' + data.max_width,
+                'current-url': elem => elem.textContent = data.current_url || '-',
+                'pages-visited': elem => elem.textContent = data.total_visited,
+                'matches-found': elem => elem.textContent = data.matched_count,
+                'main-depth-progress': elem => elem.style.width = depthPercent + '%',
+                'main-width-progress': elem => elem.style.width = widthPercent + '%',
+                'main-current-depth': elem => elem.textContent = data.current_depth,
+                'main-max-depth': elem => elem.textContent = data.max_depth,
+                'main-current-width': elem => elem.textContent = data.current_width,
+                'main-max-width': elem => elem.textContent = data.max_width,
+                'main-current-url': elem => elem.textContent = data.current_url || 'Not started'
+            };
+            
+            Object.entries(elements).forEach(([id, updateFn]) => {
+                const elem = safeGetElement(id);
+                if (elem) updateFn(elem);
+            });
+        }
+
+        // Tree Visualization Functions
+        function initializeTreeVisualization(crawlData, configData) {
+            try {
+                console.log('Building tree data from crawl results...');
+                treeData = buildTreeData(crawlData, configData);
+                console.log('Tree data built successfully:', treeData);
+                createTreeVisualization();
+            } catch (error) {
+                console.error('Error initializing tree visualization:', error);
+            }
+        }
+
+        function buildTreeData(results, config) {
+            const nodeMap = new Map();
+            const seedUrl = config ? config.seed_url : 'http://upi.edu';
+            
+            // Create root node
+            const root = {
+                name: seedUrl,
+                title: "Root",
+                url: seedUrl,
+                depth: 0,
+                children: []
+            };
+            nodeMap.set(seedUrl, root);
+            
+            // Sort results by depth
+            results.sort((a, b) => a.depth - b.depth);
+            
+            // Add each result to the tree
+            results.forEach(result => {
+                const node = {
+                    name: result.url,
+                    title: result.title || result.url,
+                    url: result.url,
+                    depth: result.depth,
+                    children: []
+                };
                 
-                // Store interval ID to clear it later
-                window.progressInterval = progressInterval;
+                nodeMap.set(result.url, node);
                 
-                // Stop progress tracking after a reasonable timeout (5 minutes)
-                setTimeout(function() {
-                    if (window.progressInterval) {
-                        clearInterval(window.progressInterval);
-                    }
-                }, 5 * 60 * 1000);
+                // Find parent and add this node as child
+                if (result.parent && nodeMap.has(result.parent)) {
+                    nodeMap.get(result.parent).children.push(node);
+                } else {
+                    root.children.push(node);
+                }
+            });
+            
+            return root;
+        }
+
+        function createTreeVisualization() {
+            const container = safeGetElement('tree-visualization');
+            if (!container) {
+                console.error('Tree visualization container not found');
+                return;
+            }
+            
+            const rect = container.getBoundingClientRect();
+            width = rect.width || 800;
+            height = rect.height || 400;
+            
+            // Clear existing SVG
+            d3.select('#tree-svg').selectAll('*').remove();
+            
+            svg = d3.select('#tree-svg')
+                .attr('width', width)
+                .attr('height', height);
+            
+            g = svg.append('g');
+            
+            // Add zoom and pan
+            const zoom = d3.zoom()
+                .scaleExtent([0.1, 3])
+                .on('zoom', function(event) {
+                    g.attr('transform', event.transform);
+                });
+            
+            svg.call(zoom);
+            
+            // Create tree layout
+            tree = d3.tree().size([height - 100, width - 100]);
+            
+            // Create hierarchy
+            root = d3.hierarchy(treeData, d => d.children);
+            root.x0 = height / 2;
+            root.y0 = 0;
+            
+            // Initially collapse nodes beyond depth 2
+            if (root.children) {
+                root.children.forEach(collapse);
+            }
+            
+            update(root);
+            setupTreeControls();
+        }
+
+        function update(source) {
+            if (!tree || !root) return;
+            
+            // Compute the new tree layout
+            const treeData = tree(root);
+            const nodes = treeData.descendants();
+            const links = treeData.descendants().slice(1);
+            
+            // Normalize for fixed-depth
+            nodes.forEach(d => { d.y = d.depth * 180 });
+            
+            // Update the nodes
+            const node = g.selectAll('g.node')
+                .data(nodes, d => d.id || (d.id = ++i));
+                
+            // Enter any new nodes
+            const nodeEnter = node.enter().append('g')
+                .attr('class', 'node')
+                .attr('transform', d => `translate(${source.y0},${source.x0})`)
+                .on('click', click)
+                .on('mouseover', function(event, d) {
+                    showTooltip(event, d);
+                })
+                .on('mouseout', hideTooltip);
+                
+            // Add circles for the nodes
+            nodeEnter.append('circle')
+                .attr('r', 1e-6)
+                .style('fill', d => d._children ? '#3b82f6' : '#fff')
+                .style('stroke', d => getNodeColor(d))
+                .style('stroke-width', '2px');
+                
+            // Add labels for the nodes
+            nodeEnter.append('text')
+                .attr('dy', '.35em')
+                .attr('x', d => d.children || d._children ? -13 : 13)
+                .attr('text-anchor', d => d.children || d._children ? 'end' : 'start')
+                .text(d => truncateText(d.data.title, 20))
+                .style('fill-opacity', 1e-6);
+                
+            // Transition nodes to their new position
+            const nodeUpdate = nodeEnter.merge(node);
+            
+            nodeUpdate.transition()
+                .duration(duration)
+                .attr('transform', d => `translate(${d.y},${d.x})`);
+                
+            nodeUpdate.select('circle')
+                .attr('r', 6)
+                .style('fill', d => d._children ? '#3b82f6' : '#fff')
+                .style('stroke', d => getNodeColor(d))
+                .attr('class', d => getNodeClass(d));
+                
+            nodeUpdate.select('text')
+                .style('fill-opacity', 1);
+                
+            // Transition exiting nodes
+            const nodeExit = node.exit().transition()
+                .duration(duration)
+                .attr('transform', d => `translate(${source.y},${source.x})`)
+                .remove();
+                
+            nodeExit.select('circle')
+                .attr('r', 1e-6);
+                
+            nodeExit.select('text')
+                .style('fill-opacity', 1e-6);
+                
+            // Update the links
+            const link = g.selectAll('path.link')
+                .data(links, d => d.id);
+                
+            // Enter any new links
+            const linkEnter = link.enter().insert('path', 'g')
+                .attr('class', 'link')
+                .attr('d', d => {
+                    const o = {x: source.x0, y: source.y0};
+                    return diagonal(o, o);
+                });
+                
+            // Transition links
+            linkEnter.merge(link).transition()
+                .duration(duration)
+                .attr('d', d => diagonal(d, d.parent));
+                
+            // Transition exiting links
+            link.exit().transition()
+                .duration(duration)
+                .attr('d', d => {
+                    const o = {x: source.x, y: source.y};
+                    return diagonal(o, o);
+                })
+                .remove();
+                
+            // Store old positions
+            nodes.forEach(d => {
+                d.x0 = d.x;
+                d.y0 = d.y;
+            });
+        }
+
+        function diagonal(s, d) {
+            return `M ${s.y} ${s.x}
+                    C ${(s.y + d.y) / 2} ${s.x},
+                      ${(s.y + d.y) / 2} ${d.x},
+                      ${d.y} ${d.x}`;
+        }
+
+        function click(event, d) {
+            if (d.children) {
+                d._children = d.children;
+                d.children = null;
+            } else {
+                d.children = d._children;
+                d._children = null;
+            }
+            update(d);
+        }
+
+        function collapse(d) {
+            if (d.children) {
+                d._children = d.children;
+                d._children.forEach(collapse);
+                d.children = null;
+            }
+        }
+
+        function expand(d) {
+            if (d._children) {
+                d.children = d._children;
+                d.children.forEach(expand);
+                d._children = null;
+            }
+        }
+
+        function getNodeColor(d) {
+            if (d.depth === 0) return '#059669'; // Root - green
+            if (d.children || d._children) return '#1e40af'; // Internal - blue
+            return '#d97706'; // Leaf - orange
+        }
+
+        function getNodeClass(d) {
+            if (d.depth === 0) return 'root';
+            if (d.children || d._children) return 'internal';
+            return 'leaf';
+        }
+
+        function truncateText(text, maxLength) {
+            if (!text) return '';
+            if (text.length <= maxLength) return text;
+            return text.substring(0, maxLength) + '...';
+        }
+
+        function showTooltip(event, d) {
+            const tooltip = safeGetElement('tree-tooltip');
+            if (!tooltip) return;
+            
+            tooltip.innerHTML = `
+                <strong>${d.data.title}</strong><br/>
+                URL: ${d.data.url}<br/>
+                Depth: ${d.depth}<br/>
+                Children: ${(d.children || d._children || []).length}
+            `;
+            tooltip.style.display = 'block';
+            tooltip.style.left = (event.pageX + 10) + 'px';
+            tooltip.style.top = (event.pageY - 10) + 'px';
+        }
+
+        function hideTooltip() {
+            const tooltip = safeGetElement('tree-tooltip');
+            if (tooltip) {
+                tooltip.style.display = 'none';
+            }
+        }
+
+        function setupTreeControls() {
+            const controls = {
+                'expand-all': () => { expandAll(root); update(root); },
+                'collapse-all': () => { collapseAll(root); update(root); },
+                'center-tree': centerTree,
+                'fit-to-screen': fitToScreen
+            };
+            
+            Object.entries(controls).forEach(([id, handler]) => {
+                const element = safeGetElement(id);
+                if (element) {
+                    element.addEventListener('click', handler);
+                }
+            });
+        }
+
+        function expandAll(d) {
+            if (d._children) {
+                d.children = d._children;
+                d._children = null;
+            }
+            if (d.children) {
+                d.children.forEach(expandAll);
+            }
+        }
+
+        function collapseAll(d) {
+            if (d.children) {
+                d._children = d.children;
+                d.children = null;
+                d._children.forEach(collapseAll);
+            }
+        }
+
+        function centerTree() {
+            if (!g || !svg) return;
+            
+            try {
+                const bounds = g.node().getBBox();
+                const fullWidth = width;
+                const fullHeight = height;
+                const widthScale = fullWidth / bounds.width;
+                const heightScale = fullHeight / bounds.height;
+                const scale = 0.8 * Math.min(widthScale, heightScale);
+                const translate = [
+                    fullWidth / 2 - scale * (bounds.x + bounds.width / 2), 
+                    fullHeight / 2 - scale * (bounds.y + bounds.height / 2)
+                ];
+                
+                svg.transition()
+                    .duration(750)
+                    .call(d3.zoom().transform, d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale));
+            } catch (error) {
+                console.error('Error centering tree:', error);
+            }
+        }
+
+        function fitToScreen() {
+            if (!g || !svg) return;
+            
+            try {
+                const bounds = g.node().getBBox();
+                const fullWidth = width;
+                const fullHeight = height;
+                const widthScale = (fullWidth * 0.9) / bounds.width;
+                const heightScale = (fullHeight * 0.9) / bounds.height;
+                const scale = Math.min(widthScale, heightScale);
+                const translate = [
+                    fullWidth / 2 - scale * (bounds.x + bounds.width / 2), 
+                    fullHeight / 2 - scale * (bounds.y + bounds.height / 2)
+                ];
+                
+                svg.transition()
+                    .duration(750)
+                    .call(d3.zoom().transform, d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale));
+            } catch (error) {
+                console.error('Error fitting tree to screen:', error);
+            }
+        }
+
+        function refreshTreeVisualization() {
+            if (treeData) {
+                createTreeVisualization();
+            }
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            if (treeData) {
+                setTimeout(refreshTreeVisualization, 100);
             }
         });
     </script>
